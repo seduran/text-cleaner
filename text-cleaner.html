@@ -1,0 +1,858 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Text Cleaner</title>
+<meta name="description" content="A fast, privacy-first text cleaner that runs entirely in your browser.">
+<style>
+  :root {
+    --bg: #0b0f14;
+    --panel: #111722;
+    --subpanel: #0f1520;
+    --text: #e7edf5;
+    --muted: #a7b0bf;
+    --accent: #3ca2ff;
+    --accent-2: #2dd4bf;
+    --border: #1b2331;
+    --danger: #f87171;
+    --success: #22c55e;
+    --shadow: 0 8px 24px rgba(0,0,0,.35);
+    --radius: 12px;
+    --radius-sm: 8px;
+    --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, "Noto Sans", Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f7f9fc;
+      --panel: #ffffff;
+      --subpanel: #f2f5fa;
+      --text: #0c1320;
+      --muted: #576073;
+      --accent: #0d6efd;
+      --accent-2: #0ea5a4;
+      --border: #d8e0ee;
+      --danger: #dc2626;
+      --success: #16a34a;
+      --shadow: 0 8px 20px rgba(10,20,40,.08);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: var(--font);
+    color: var(--text);
+    background: radial-gradient(1200px 600px at 20% -10%, rgba(60,162,255,.15), transparent 60%),
+                radial-gradient(900px 500px at 95% 0%, rgba(45,212,191,.2), transparent 60%),
+                var(--bg);
+    min-height: 100vh;
+  }
+  header {
+    position: sticky; top: 0; z-index: 5;
+    backdrop-filter: blur(8px);
+    background: color-mix(in oklab, var(--bg) 85%, transparent);
+    border-bottom: 1px solid var(--border);
+  }
+  .wrap {
+    max-width: 1200px;
+    margin: 0 auto; padding: 16px;
+  }
+  .bar {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .title { font-weight: 800; letter-spacing: .3px; font-size: 20px; display:flex; align-items:center; gap:10px; }
+  .title .badge { font-size: 12px; padding: 2px 8px; background: var(--subpanel); border:1px solid var(--border); border-radius: 999px; color: var(--muted); }
+  .spacer { flex: 1; }
+  .btn, button, .chip {
+    appearance: none; border:1px solid var(--border); background: var(--panel); color: var(--text);
+    padding: 10px 14px; border-radius: var(--radius-sm); cursor: pointer; font-weight: 600;
+    transition: transform .04s ease, background .2s ease, border-color .2s ease, color .2s ease, box-shadow .2s ease;
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn.primary { background: linear-gradient(135deg, var(--accent), #7cc6ff); color: white; border-color: transparent; }
+  .btn.success { background: linear-gradient(135deg, var(--success), #4ade80); color: white; border-color: transparent; }
+  .btn.danger { background: linear-gradient(135deg, var(--danger), #fb7185); color:white; border-color: transparent; }
+  .btn.ghost { background: var(--subpanel); }
+  .icon { opacity: .9; margin-right: 6px; }
+  .grid {
+    display: grid; gap: 16px; padding: 16px;
+    grid-template-columns: 1fr 1fr;
+  }
+  @media (max-width: 980px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+  .pane {
+    background: color-mix(in oklab, var(--panel) 87%, transparent);
+    border:1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
+    overflow: hidden; display:flex; flex-direction: column; min-height: 320px;
+  }
+  .pane h3 {
+    margin: 0; padding: 12px 14px; font-size: 14px; border-bottom: 1px solid var(--border);
+    display:flex; align-items:center; gap:10px; background: color-mix(in oklab, var(--panel) 94%, transparent);
+  }
+  .stats {
+    display:flex; gap: 10px; margin-left: auto; color: var(--muted); font-size: 12px; flex-wrap: wrap;
+  }
+  .stats .pill { background: var(--subpanel); border:1px solid var(--border); padding: 2px 8px; border-radius: 999px; }
+  textarea {
+    width: 100%; flex:1; resize: vertical; min-height: 200px;
+    background: transparent; color: var(--text); border: none; outline: none;
+    padding: 14px; font-size: 15px; line-height: 1.5; font-family: var(--mono);
+  }
+  .controls {
+    border-top: 1px solid var(--border);
+    display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; background: color-mix(in oklab, var(--panel) 94%, transparent);
+  }
+  .options {
+    background: color-mix(in oklab, var(--panel) 87%, transparent);
+    border:1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
+  }
+  .opt-wrap {
+    display: grid; gap: 12px; grid-template-columns: repeat(12, 1fr);
+    padding: 12px; border-top: 1px dashed var(--border);
+  }
+  .group { grid-column: span 12; background: var(--subpanel); border:1px solid var(--border); border-radius: var(--radius-sm); padding: 10px; }
+  .group h4 { margin: 0 0 8px; font-size: 13px; color: var(--muted); letter-spacing: .2px; }
+  .row { display:flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  label.chk {
+    display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border:1px solid var(--border);
+    border-radius: 10px; background: color-mix(in oklab, var(--panel) 94%, transparent); cursor: pointer; font-size: 13px;
+  }
+  input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
+  select, input[type="number"], input[type="text"] {
+    padding: 8px 10px; border:1px solid var(--border); border-radius: 10px; background: var(--panel); color: var(--text);
+  }
+  details { border-top: 1px solid var(--border); }
+  details > summary {
+    list-style: none; cursor: pointer; padding: 10px 12px; font-weight: 700; color: var(--muted);
+  }
+  details[open] > summary { color: var(--text); }
+  .help { color: var(--muted); font-size: 12px; }
+  .footer {
+    opacity: .8; color: var(--muted); text-align: center; padding: 20px 10px; font-size: 12px;
+  }
+  .kbd {
+    font-family: var(--mono); background: var(--subpanel); padding: 2px 6px; border-radius: 6px; border:1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div class="wrap bar">
+      <div class="title">
+        🧼 Text Cleaner
+        <span class="badge">offline • privacy‑first</span>
+      </div>
+      <div class="spacer"></div>
+      <label class="chk"><input type="checkbox" id="liveMode" checked> Live clean</label>
+      <button class="btn ghost" id="resetOptions" title="Reset all options">Reset options</button>
+      <button class="btn" id="themeToggle">Toggle theme</button>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div class="grid">
+      <section class="pane" id="inputPane">
+        <h3>
+          Input
+          <span class="stats" id="inStats">
+            <span class="pill" title="Characters">0 chars</span>
+            <span class="pill" title="Words">0 words</span>
+            <span class="pill" title="Lines">0 lines</span>
+          </span>
+        </h3>
+        <textarea id="input" placeholder="Paste or type text here..."></textarea>
+        <div class="controls">
+          <button class="btn" id="pasteBtn">Paste</button>
+          <button class="btn ghost" id="clearBtn">Clear</button>
+          <label class="btn ghost" title="Import .txt">
+            <input type="file" id="fileInput" accept=".txt,.csv,.md,.log,.json,.html,.xml" hidden>
+            Import file
+          </label>
+          <div class="spacer"></div>
+          <button class="btn primary" id="applyBtn" title="Apply cleaning (Ctrl/Cmd+Enter)">Apply</button>
+        </div>
+      </section>
+
+      <section class="pane" id="outputPane">
+        <h3>
+          Output
+          <span class="stats" id="outStats">
+            <span class="pill">0 chars</span>
+            <span class="pill">0 words</span>
+            <span class="pill">0 lines</span>
+          </span>
+        </h3>
+        <textarea id="output" placeholder="Cleaned text will appear here..." readonly></textarea>
+        <div class="controls">
+          <button class="btn success" id="copyBtn">Copy</button>
+          <button class="btn ghost" id="swapBtn" title="Move output to input">Send to input</button>
+          <button class="btn ghost" id="downloadBtn">Download .txt</button>
+          <button class="btn ghost" id="shareBtn">Share</button>
+        </div>
+      </section>
+    </div>
+
+    <section class="options">
+      <div class="opt-wrap">
+        <div class="group">
+          <h4>Whitespace</h4>
+          <div class="row">
+            <label class="chk"><input type="checkbox" id="trim"> Trim ends</label>
+            <label class="chk"><input type="checkbox" id="trimLines"> Trim each line</label>
+            <label class="chk"><input type="checkbox" id="collapseSpaces" checked> Collapse multiple spaces</label>
+            <label class="chk"><input type="checkbox" id="normalizeEOL" checked> Normalize line endings</label>
+            <label class="chk"><input type="checkbox" id="removeEmptyLines"> Remove empty lines</label>
+            <label class="chk"><input type="checkbox" id="collapseBlankLines" checked> Collapse blank lines</label>
+            <label class="chk"><input type="checkbox" id="replaceTabs"> Replace tabs with
+              <input type="number" id="tabSize" min="1" max="8" value="2" style="width:64px;margin-left:6px;">
+              spaces
+            </label>
+          </div>
+        </div>
+
+        <div class="group">
+          <h4>Characters</h4>
+          <div class="row">
+            <label class="chk"><input type="checkbox" id="removePunct"> Remove punctuation</label>
+            <label class="chk"><input type="checkbox" id="removeDigits"> Remove digits</label>
+            <label class="chk"><input type="checkbox" id="removeEmojis"> Remove emojis</label>
+            <label class="chk"><input type="checkbox" id="removeDiacritics"> Remove diacritics</label>
+            <label class="chk"><input type="checkbox" id="asciiOnly"> Keep ASCII only</label>
+            <label class="chk"><input type="checkbox" id="stripHtml"> Strip HTML tags</label>
+            <label class="chk"><input type="checkbox" id="decodeHtml"> Decode HTML entities</label>
+          </div>
+        </div>
+
+        <div class="group">
+          <h4>Case</h4>
+          <div class="row">
+            <label class="chk"><input type="radio" name="case" value="none" checked> None</label>
+            <label class="chk"><input type="radio" name="case" value="lower"> lower</label>
+            <label class="chk"><input type="radio" name="case" value="upper"> UPPER</label>
+            <label class="chk"><input type="radio" name="case" value="title"> Title Case</label>
+            <label class="chk"><input type="radio" name="case" value="sentence"> Sentence case</label>
+          </div>
+        </div>
+
+        <div class="group">
+          <h4>Lines</h4>
+          <div class="row">
+            <label class="chk"><input type="checkbox" id="removeBullets"> Remove bullets/numbering</label>
+            <label class="chk"><input type="checkbox" id="uniqueLines"> Unique lines</label>
+            <label class="chk"><input type="checkbox" id="uniqueIgnoreCase" checked> Unique: ignore case</label>
+            <label class="chk">Sort
+              <select id="sortLines" style="margin-left:6px;">
+                <option value="none">None</option>
+                <option value="asc">Ascending</option>
+                <option value="desc">Descending</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div class="group">
+          <h4>Words</h4>
+          <div class="row">
+            <label class="chk"><input type="checkbox" id="removeStopwords"> Remove English stopwords</label>
+            <input type="text" id="customStopwords" placeholder="Custom stopwords (comma-separated)" style="min-width:280px;">
+          </div>
+          <div class="help">Tip: Custom stopwords are case-insensitive. Example: foo,bar,baz</div>
+        </div>
+
+        <div class="group">
+          <h4>Transform</h4>
+          <div class="row">
+            <label class="chk"><input type="checkbox" id="slugify"> slugify</label>
+            <label class="chk"><input type="checkbox" id="snake"> snake_case</label>
+            <label class="chk"><input type="checkbox" id="camel"> camelCase</label>
+            <label class="chk"><input type="checkbox" id="kebab"> kebab-case</label>
+          </div>
+          <div class="help">Note: These transforms are mutually exclusive; the first checked (left-to-right) wins.</div>
+        </div>
+      </div>
+
+      <details>
+        <summary>Advanced options</summary>
+        <div class="opt-wrap">
+          <div class="group">
+            <h4>HTML & Entities</h4>
+            <div class="row">
+              <label class="chk"><input type="checkbox" id="encodeHtml"> Encode HTML entities</label>
+            </div>
+          </div>
+          <div class="group">
+            <h4>Find & Replace</h4>
+            <div class="row">
+              <input type="text" id="findText" placeholder="Find (supports regex e.g., \\d+)">
+              <input type="text" id="replaceText" placeholder="Replace with">
+              <label class="chk"><input type="checkbox" id="regexMode"> Regex</label>
+              <label class="chk"><input type="checkbox" id="caseInsensitive" checked> Case-insensitive</label>
+              <label class="chk"><input type="checkbox" id="multiline"> Multiline</label>
+              <button class="btn" id="findReplaceBtn">Run replace</button>
+            </div>
+          </div>
+          <div class="group">
+            <h4>Live Preview Controls</h4>
+            <div class="row">
+              <label class="chk"><input type="checkbox" id="autoSelectOutput" checked> Auto-select output on copy</label>
+              <label class="chk"><input type="checkbox" id="autoScroll" checked> Auto-scroll to output</label>
+            </div>
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <div class="footer">
+      Keyboard: <span class="kbd">Ctrl/Cmd + Enter</span> Apply • <span class="kbd">Ctrl/Cmd + C</span> Copy Output
+      • Made with ❤️ — Your text never leaves your device.
+    </div>
+  </div>
+
+<script>
+(() => {
+  const $ = sel => document.querySelector(sel);
+  const $$ = sel => [...document.querySelectorAll(sel)];
+
+  // Elements
+  const els = {
+    input: $('#input'),
+    output: $('#output'),
+    applyBtn: $('#applyBtn'),
+    liveMode: $('#liveMode'),
+    pasteBtn: $('#pasteBtn'),
+    clearBtn: $('#clearBtn'),
+    copyBtn: $('#copyBtn'),
+    swapBtn: $('#swapBtn'),
+    downloadBtn: $('#downloadBtn'),
+    shareBtn: $('#shareBtn'),
+    fileInput: $('#fileInput'),
+    resetOptions: $('#resetOptions'),
+    themeToggle: $('#themeToggle'),
+    inStats: $('#inStats'),
+    outStats: $('#outStats'),
+    findInput: $('#findText'),
+    replaceInput: $('#replaceText'),
+    findReplaceBtn: $('#findReplaceBtn'),
+    autoSelectOutput: $('#autoSelectOutput'),
+    autoScroll: $('#autoScroll'),
+    // options
+    opts: {
+      trim: $('#trim'),
+      trimLines: $('#trimLines'),
+      collapseSpaces: $('#collapseSpaces'),
+      normalizeEOL: $('#normalizeEOL'),
+      removeEmptyLines: $('#removeEmptyLines'),
+      collapseBlankLines: $('#collapseBlankLines'),
+      replaceTabs: $('#replaceTabs'),
+      tabSize: $('#tabSize'),
+      removePunct: $('#removePunct'),
+      removeDigits: $('#removeDigits'),
+      removeEmojis: $('#removeEmojis'),
+      removeDiacritics: $('#removeDiacritics'),
+      asciiOnly: $('#asciiOnly'),
+      stripHtml: $('#stripHtml'),
+      decodeHtml: $('#decodeHtml'),
+      encodeHtml: $('#encodeHtml'),
+      caseRadios: $$('input[name="case"]'),
+      removeBullets: $('#removeBullets'),
+      uniqueLines: $('#uniqueLines'),
+      uniqueIgnoreCase: $('#uniqueIgnoreCase'),
+      sortLines: $('#sortLines'),
+      removeStopwords: $('#removeStopwords'),
+      customStopwords: $('#customStopwords'),
+      slugify: $('#slugify'),
+      snake: $('#snake'),
+      camel: $('#camel'),
+      kebab: $('#kebab'),
+      regexMode: $('#regexMode'),
+      caseInsensitive: $('#caseInsensitive'),
+      multiline: $('#multiline'),
+    }
+  };
+
+  // Utilities
+  const supportsProp = prop => {
+    try { new RegExp('\\p{' + prop + '}', 'u'); return true; } catch { return false; }
+  };
+  const RE = {
+    punct: supportsProp('P') ? /\p{P}+/gu : /[.,/#!$%^&*;:{}=\-_`~()"'[```\\<>?|+]+/g,
+    letter: supportsProp('L') ? /\p{L}/u : /[A-Za-z]/,
+    word: supportsProp('L') ? /\p{L}[\p{L}\p{M}\p{N}'’_-]*/gu : /[A-Za-z0-9_'’_-]+/g,
+    emoji: supportsProp('Extended_Pictographic') ? /\p{Extended_Pictographic}|\uFE0F/gu : /[\u231A-\u27BF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|\uD83E[\uDD00-\uDDFF]/g,
+    digits: /\d+/g,
+    tabs: /\t/g,
+    eol: /\r\n?/g,
+    blankLines: /\n{2,}/g,
+    emptyLine: /^\s*$(?:\r?\n)?/gm,
+    bullets: /^\s*(?:[-–—*•·]+|\d{1,4}[.)])\s+/gm,
+    nonAscii: /[^\x00-\x7F]+/g,
+    sentenceBoundary: /(^\s*[a-zA-Z]|[.!?]\s+[a-zA-Z])/g, // rough
+  };
+
+  // Stopwords (English - compact set)
+  const STOPWORDS = new Set([
+    'a','about','above','after','again','against','all','am','an','and','any','are','aren\'t','as','at',
+    'be','because','been','before','being','below','between','both','but','by',
+    'can','can\'t','cannot','could','couldn\'t',
+    'did','didn\'t','do','does','doesn\'t','doing','don\'t','down','during',
+    'each','few','for','from','further',
+    'had','hadn\'t','has','hasn\'t','have','haven\'t','having','he','he\'d','he\'ll','he\'s','her','here','here\'s','hers','herself','him','himself','his','how','how\'s',
+    'i','i\'d','i\'ll','i\'m','i\'ve','if','in','into','is','isn\'t','it','it\'s','its','itself',
+    'let\'s','me','more','most','mustn\'t','my','myself',
+    'no','nor','not','of','off','on','once','only','or','other','ought','our','ours','ourselves','out','over','own',
+    'same','she','she\'d','she\'ll','she\'s','should','shouldn\'t','so','some','such',
+    'than','that','that\'s','the','their','theirs','them','themselves','then','there','there\'s','these','they','they\'d','they\'ll','they\'re','they\'ve','this','those','through','to','too',
+    'under','until','up','very',
+    'was','wasn\'t','we','we\'d','we\'ll','we\'re','we\'ve','were','weren\'t','what','what\'s','when','when\'s','where','where\'s','which','while','who','who\'s','whom','why','why\'s','with','won\'t','would','wouldn\'t',
+    'you','you\'d','you\'ll','you\'re','you\'ve','your','yours','yourself','yourselves'
+  ]);
+
+  const debounce = (fn, ms=150) => {
+    let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+  };
+
+  // Stats
+  function getStats(text) {
+    const chars = text.length;
+    const words = (text.match(RE.word) || []).length;
+    const lines = text === '' ? 0 : text.split(/\r\n|\r|\n/).length;
+    return { chars, words, lines };
+  }
+  function renderStats(el, stats) {
+    const pills = el.querySelectorAll('.pill');
+    pills[0].textContent = `${stats.chars} chars`;
+    pills[1].textContent = `${stats.words} words`;
+    pills[2].textContent = `${stats.lines} lines`;
+  }
+
+  // HTML entities
+  function decodeHTMLEntities(text) {
+    const div = document.createElement('textarea');
+    div.innerHTML = text;
+    return div.value;
+  }
+  function encodeHTMLEntities(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+  function stripHTML(text) {
+    const div = document.createElement('div');
+    div.innerHTML = text;
+    return div.textContent || '';
+  }
+
+  // Case transforms
+  function toTitleCase(text) {
+    return text.toLowerCase().replace(/\b([\p{L}\p{M}\p{N}])/gu, (m, g1) => g1.toUpperCase());
+  }
+  function toSentenceCase(text) {
+    let out = text.toLowerCase();
+    // Capitalize after start or sentence end punctuation + space(s)
+    out = out.replace(/(^\s*\p{L})|([.!?]\s+)(\p{L})/gu, (m, a, b, c) => (a ? a.toUpperCase() : b + c.toUpperCase()));
+    return out;
+  }
+
+  // Transform helpers
+  const removeDiacritics = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const toSlug = (s) => {
+    s = removeDiacritics(s).toLowerCase();
+    s = s.replace(/[^a-z0-9]+/g, '-').replace(/-{2,}/g, '-').replace(/^-+|-+$/g, '');
+    return s;
+  };
+  const toSnake = (s) => {
+    s = removeDiacritics(s);
+    s = s.replace(/([a-z0-9])([A-Z])/g, '$1_$2');
+    s = s.replace(/[^A-Za-z0-9]+/g, '_').replace(/_{2,}/g, '_').replace(/^_+|_+$/g, '');
+    return s.toLowerCase();
+  };
+  const toKebab = (s) => toSnake(s).replace(/_/g, '-');
+  const toCamel = (s) => {
+    s = toSnake(s).split('_').filter(Boolean);
+    if (!s.length) return '';
+    return s[0] + s.slice(1).map(w => w[0] ? w[0].toUpperCase()+w.slice(1) : w).join('');
+  };
+
+  // Find/replace
+  function applyFindReplace(text, find, replace, flags) {
+    if (!find) return text;
+    try {
+      const re = new RegExp(find, flags);
+      return text.replace(re, replace);
+    } catch (e) {
+      console.warn('Invalid regex:', e);
+      return text;
+    }
+  }
+
+  // Cleaning pipeline
+  function getOptions() {
+    const caseVal = els.opts.caseRadios.find(r => r.checked)?.value || 'none';
+    return {
+      trim: els.opts.trim.checked,
+      trimLines: els.opts.trimLines.checked,
+      collapseSpaces: els.opts.collapseSpaces.checked,
+      normalizeEOL: els.opts.normalizeEOL.checked,
+      removeEmptyLines: els.opts.removeEmptyLines.checked,
+      collapseBlankLines: els.opts.collapseBlankLines.checked,
+      replaceTabs: els.opts.replaceTabs.checked,
+      tabSize: Math.min(8, Math.max(1, parseInt(els.opts.tabSize.value || '2', 10))),
+      removePunct: els.opts.removePunct.checked,
+      removeDigits: els.opts.removeDigits.checked,
+      removeEmojis: els.opts.removeEmojis.checked,
+      removeDiacritics: els.opts.removeDiacritics.checked,
+      asciiOnly: els.opts.asciiOnly.checked,
+      stripHtml: els.opts.stripHtml.checked,
+      decodeHtml: els.opts.decodeHtml.checked,
+      encodeHtml: els.opts.encodeHtml.checked,
+      caseMode: caseVal,
+      removeBullets: els.opts.removeBullets.checked,
+      uniqueLines: els.opts.uniqueLines.checked,
+      uniqueIgnoreCase: els.opts.uniqueIgnoreCase.checked,
+      sortLines: els.opts.sortLines.value,
+      removeStopwords: els.opts.removeStopwords.checked,
+      customStopwords: (els.opts.customStopwords.value || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean),
+      slugify: els.opts.slugify.checked,
+      snake: els.opts.snake.checked,
+      camel: els.opts.camel.checked,
+      kebab: els.opts.kebab.checked,
+      // find/replace
+      find: els.findInput.value,
+      replace: els.replaceInput.value,
+      regex: els.opts.regexMode.checked,
+      ci: els.opts.caseInsensitive.checked,
+      ml: els.opts.multiline.checked,
+    };
+  }
+
+  function cleanText(input, o) {
+    let t = input;
+
+    // EOL normalization first for consistent line ops
+    if (o.normalizeEOL) t = t.replace(RE.eol, '\n');
+
+    // Tabs
+    if (o.replaceTabs) t = t.replace(RE.tabs, ' '.repeat(o.tabSize));
+
+    // HTML handling
+    if (o.decodeHtml) t = decodeHTMLEntities(t);
+    if (o.stripHtml) t = stripHTML(t);
+
+    // Trim ends
+    if (o.trim) t = t.trim();
+
+    // Per-line pre-processing
+    let lines = t.split('\n');
+
+    if (o.removeBullets) {
+      lines = lines.map(l => l.replace(RE.bullets, ''));
+    }
+    if (o.trimLines) {
+      lines = lines.map(l => l.trim());
+    }
+    // Remove empty lines entirely
+    if (o.removeEmptyLines) {
+      lines = lines.filter(l => l.trim().length > 0);
+    }
+    t = lines.join('\n');
+
+    // Characters ops
+    if (o.removePunct) t = t.replace(RE.punct, '');
+    if (o.removeDigits) t = t.replace(RE.digits, '');
+    if (o.removeEmojis) t = t.replace(RE.emoji, '');
+    if (o.removeDiacritics) t = removeDiacritics(t);
+    if (o.asciiOnly) t = t.replace(RE.nonAscii, '');
+
+    // Collapse spaces (after char-level removals)
+    if (o.collapseSpaces) t = t.replace(/[ \t]+/g, ' ').replace(/ *\n */g, '\n');
+
+    // Blank lines collapse (after space cleanup)
+    if (o.collapseBlankLines) t = t.replace(RE.blankLines, '\n');
+
+    // Case transforms
+    if (o.caseMode === 'lower') t = t.toLowerCase();
+    else if (o.caseMode === 'upper') t = t.toUpperCase();
+    else if (o.caseMode === 'title') t = toTitleCase(t);
+    else if (o.caseMode === 'sentence') t = toSentenceCase(t);
+
+    // Stopwords removal
+    if (o.removeStopwords || o.customStopwords.length) {
+      const custom = new Set(o.customStopwords);
+      const shouldRemove = (w) => {
+        const lw = w.toLowerCase();
+        return (o.removeStopwords && STOPWORDS.has(lw)) || (custom.size && custom.has(lw));
+      };
+      // Tokenize by words and non-words to preserve spacing
+      const tokens = t.match(/\p{L}[\p{L}\p{M}\p{N}'’_-]*|[^ \t\r\n\p{L}\p{M}\p{N}'’_-]+|[ \t\r\n]+/gu) || [t];
+      t = tokens.filter(tok => {
+        if (/\p{L}/u.test(tok)) return !shouldRemove(tok);
+        return true;
+      }).join('');
+      // Clean extra spaces created
+      t = t.replace(/[ \t]+/g, ' ').replace(/ *\n */g, '\n').replace(RE.blankLines, '\n').trim();
+    }
+
+    // Line-level post ops
+    lines = t.split('\n');
+    if (o.uniqueLines) {
+      const seen = new Set();
+      const out = [];
+      for (const line of lines) {
+        const key = o.uniqueIgnoreCase ? line.toLowerCase() : line;
+        if (!seen.has(key)) { seen.add(key); out.push(line); }
+      }
+      lines = out;
+    }
+    if (o.sortLines !== 'none') {
+      const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+      lines = lines.slice().sort((a, b) => collator.compare(a, b));
+      if (o.sortLines === 'desc') lines.reverse();
+    }
+    t = lines.join('\n');
+
+    // Find & replace
+    if (o.find) {
+      let flags = 'g';
+      if (o.ci) flags += 'i';
+      if (o.ml) flags += 'm';
+      t = o.regex ? applyFindReplace(t, o.find, o.replace, flags) : t.split(o.find).join(o.replace);
+    }
+
+    // Transforms (mutually exclusive priority: slugify > snake > camel > kebab)
+    if (o.slugify) t = toSlug(t);
+    else if (o.snake) t = toSnake(t);
+    else if (o.camel) t = toCamel(t);
+    else if (o.kebab) t = toKebab(t);
+
+    // Encode HTML (last)
+    if (o.encodeHtml) t = encodeHTMLEntities(t);
+
+    return t;
+  }
+
+  // Render
+  const apply = () => {
+    const text = els.input.value;
+    renderStats(els.inStats, getStats(text));
+    const opts = getOptions();
+    const cleaned = cleanText(text, opts);
+    els.output.value = cleaned;
+    renderStats(els.outStats, getStats(cleaned));
+    if (els.autoScroll.checked) {
+      $('#outputPane').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+    saveState();
+  };
+
+  const liveApply = debounce(() => els.liveMode.checked ? apply() : null, 120);
+
+  // Clipboard & IO
+  async function copyOutput() {
+    const val = els.output.value;
+    if (!val) return;
+    try {
+      await navigator.clipboard.writeText(val);
+      if (els.autoSelectOutput.checked) {
+        els.output.focus(); els.output.select();
+      }
+      flash(els.copyBtn, 'Copied!');
+    } catch {
+      // Fallback
+      els.output.focus(); els.output.select();
+      document.execCommand('copy');
+      flash(els.copyBtn, 'Copied!');
+    }
+  }
+  async function pasteToInput() {
+    try {
+      const text = await navigator.clipboard.readText();
+      els.input.value = text;
+      liveApply();
+    } catch {
+      alert('Clipboard permission denied. Paste with Ctrl/Cmd+V.');
+    }
+  }
+  function downloadOutput() {
+    const blob = new Blob([els.output.value], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'cleaned.txt';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+  function flash(btn, text) {
+    const prev = btn.textContent;
+    btn.textContent = text;
+    setTimeout(() => btn.textContent = prev, 900);
+  }
+
+  // State persistence
+  const STORAGE_KEY = 'textCleaner:state:v1';
+  function saveState() {
+    const state = {
+      input: els.input.value.slice(0, 200000), // cap to avoid huge storage
+      options: getOptions(),
+      autoSelectOutput: els.autoSelectOutput.checked,
+      autoScroll: els.autoScroll.checked,
+      liveMode: els.liveMode.checked,
+    };
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
+  }
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const s = JSON.parse(raw);
+      if (typeof s.input === 'string') els.input.value = s.input;
+      const o = s.options || {};
+      // set options
+      els.opts.trim.checked = !!o.trim;
+      els.opts.trimLines.checked = !!o.trimLines;
+      els.opts.collapseSpaces.checked = !!o.collapseSpaces;
+      els.opts.normalizeEOL.checked = !!o.normalizeEOL;
+      els.opts.removeEmptyLines.checked = !!o.removeEmptyLines;
+      els.opts.collapseBlankLines.checked = !!o.collapseBlankLines;
+      els.opts.replaceTabs.checked = !!o.replaceTabs;
+      els.opts.tabSize.value = o.tabSize || 2;
+      els.opts.removePunct.checked = !!o.removePunct;
+      els.opts.removeDigits.checked = !!o.removeDigits;
+      els.opts.removeEmojis.checked = !!o.removeEmojis;
+      els.opts.removeDiacritics.checked = !!o.removeDiacritics;
+      els.opts.asciiOnly.checked = !!o.asciiOnly;
+      els.opts.stripHtml.checked = !!o.stripHtml;
+      els.opts.decodeHtml.checked = !!o.decodeHtml;
+      els.opts.encodeHtml.checked = !!o.encodeHtml;
+      els.opts.caseRadios.forEach(r => r.checked = r.value === (o.caseMode || 'none'));
+      els.opts.removeBullets.checked = !!o.removeBullets;
+      els.opts.uniqueLines.checked = !!o.uniqueLines;
+      els.opts.uniqueIgnoreCase.checked = !!o.uniqueIgnoreCase;
+      els.opts.sortLines.value = o.sortLines || 'none';
+      els.opts.removeStopwords.checked = !!o.removeStopwords;
+      els.opts.customStopwords.value = (o.customStopwords || []).join(', ');
+      els.opts.slugify.checked = !!o.slugify;
+      els.opts.snake.checked = !!o.snake;
+      els.opts.camel.checked = !!o.camel;
+      els.opts.kebab.checked = !!o.kebab;
+      els.findInput.value = o.find || '';
+      els.replaceInput.value = o.replace || '';
+      els.opts.regexMode.checked = !!o.regex;
+      els.opts.caseInsensitive.checked = !!o.ci;
+      els.opts.multiline.checked = !!o.ml;
+      els.autoSelectOutput.checked = !!s.autoSelectOutput;
+      els.autoScroll.checked = !!s.autoScroll;
+      els.liveMode.checked = !!s.liveMode;
+    } catch {}
+  }
+
+  // Theme toggle
+  function toggleTheme() {
+    const now = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+    document.documentElement.dataset.theme = now;
+    document.documentElement.style.colorScheme = now;
+  }
+
+  // Events
+  els.applyBtn.addEventListener('click', apply);
+  els.input.addEventListener('input', liveApply);
+  $$('.options input, .options select').forEach(el => el.addEventListener('input', liveApply));
+  els.pasteBtn.addEventListener('click', pasteToInput);
+  els.clearBtn.addEventListener('click', () => { els.input.value = ''; liveApply(); });
+  els.copyBtn.addEventListener('click', copyOutput);
+  els.swapBtn.addEventListener('click', () => { els.input.value = els.output.value; liveApply(); });
+  els.downloadBtn.addEventListener('click', downloadOutput);
+  els.shareBtn.addEventListener('click', async () => {
+    const text = els.output.value;
+    if (!text) return;
+    if (navigator.share) {
+      try { await navigator.share({ text }); } catch {}
+    } else {
+      await navigator.clipboard.writeText(text);
+      flash(els.shareBtn, 'Copied to clipboard');
+    }
+  });
+  els.fileInput.addEventListener('change', async e => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const text = await f.text();
+    els.input.value = text;
+    liveApply();
+    e.target.value = '';
+  });
+  els.findReplaceBtn.addEventListener('click', () => {
+    const o = getOptions();
+    let flags = 'g';
+    if (o.ci) flags += 'i';
+    if (o.ml) flags += 'm';
+    const src = els.input.value;
+    const out = o.regex ? applyFindReplace(src, o.find, o.replace, flags) : src.split(o.find).join(o.replace);
+    els.input.value = out;
+    liveApply();
+  });
+  els.resetOptions.addEventListener('click', () => {
+    // Reset checkboxes/selects to defaults
+    const defaults = {
+      trim:false, trimLines:false, collapseSpaces:true, normalizeEOL:true, removeEmptyLines:false,
+      collapseBlankLines:true, replaceTabs:false, tabSize:2,
+      removePunct:false, removeDigits:false, removeEmojis:false, removeDiacritics:false, asciiOnly:false,
+      stripHtml:false, decodeHtml:false, encodeHtml:false,
+      caseMode:'none', removeBullets:false, uniqueLines:false, uniqueIgnoreCase:true, sortLines:'none',
+      removeStopwords:false, customStopwords:[], slugify:false, snake:false, camel:false, kebab:false,
+      find:'', replace:'', regex:false, ci:true, ml:false
+    };
+    els.opts.trim.checked = defaults.trim;
+    els.opts.trimLines.checked = defaults.trimLines;
+    els.opts.collapseSpaces.checked = defaults.collapseSpaces;
+    els.opts.normalizeEOL.checked = defaults.normalizeEOL;
+    els.opts.removeEmptyLines.checked = defaults.removeEmptyLines;
+    els.opts.collapseBlankLines.checked = defaults.collapseBlankLines;
+    els.opts.replaceTabs.checked = defaults.replaceTabs;
+    els.opts.tabSize.value = defaults.tabSize;
+    els.opts.removePunct.checked = defaults.removePunct;
+    els.opts.removeDigits.checked = defaults.removeDigits;
+    els.opts.removeEmojis.checked = defaults.removeEmojis;
+    els.opts.removeDiacritics.checked = defaults.removeDiacritics;
+    els.opts.asciiOnly.checked = defaults.asciiOnly;
+    els.opts.stripHtml.checked = defaults.stripHtml;
+    els.opts.decodeHtml.checked = defaults.decodeHtml;
+    els.opts.encodeHtml.checked = defaults.encodeHtml;
+    els.opts.caseRadios.forEach(r => r.checked = r.value === defaults.caseMode);
+    els.opts.removeBullets.checked = defaults.removeBullets;
+    els.opts.uniqueLines.checked = defaults.uniqueLines;
+    els.opts.uniqueIgnoreCase.checked = defaults.uniqueIgnoreCase;
+    els.opts.sortLines.value = defaults.sortLines;
+    els.opts.removeStopwords.checked = defaults.removeStopwords;
+    els.opts.customStopwords.value = '';
+    els.opts.slugify.checked = defaults.slugify;
+    els.opts.snake.checked = defaults.snake;
+    els.opts.camel.checked = defaults.camel;
+    els.opts.kebab.checked = defaults.kebab;
+    els.findInput.value = defaults.find;
+    els.replaceInput.value = defaults.replace;
+    els.opts.regexMode.checked = defaults.regex;
+    els.opts.caseInsensitive.checked = defaults.ci;
+    els.opts.multiline.checked = defaults.ml;
+    liveApply();
+  });
+  els.themeToggle.addEventListener('click', toggleTheme);
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', e => {
+    const mod = e.ctrlKey || e.metaKey;
+    if (mod && e.key === 'Enter') { e.preventDefault(); apply(); }
+    if (mod && e.key.toLowerCase() === 'c') {
+      if (document.activeElement !== els.input && document.activeElement !== els.output) {
+        e.preventDefault(); copyOutput();
+      }
+    }
+  });
+
+  // Initialize
+  loadState();
+  apply();
+})();
+</script>
+</body>
+</html>
