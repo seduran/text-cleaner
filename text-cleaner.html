@@ -1,858 +1,2254 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Text Cleaner</title>
-<meta name="description" content="A fast, privacy-first text cleaner that runs entirely in your browser.">
-<style>
-  :root {
-    --bg: #0b0f14;
-    --panel: #111722;
-    --subpanel: #0f1520;
-    --text: #e7edf5;
-    --muted: #a7b0bf;
-    --accent: #3ca2ff;
-    --accent-2: #2dd4bf;
-    --border: #1b2331;
-    --danger: #f87171;
-    --success: #22c55e;
-    --shadow: 0 8px 24px rgba(0,0,0,.35);
-    --radius: 12px;
-    --radius-sm: 8px;
-    --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, "Noto Sans", Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-    --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  }
-  @media (prefers-color-scheme: light) {
-    :root {
-      --bg: #f7f9fc;
-      --panel: #ffffff;
-      --subpanel: #f2f5fa;
-      --text: #0c1320;
-      --muted: #576073;
-      --accent: #0d6efd;
-      --accent-2: #0ea5a4;
-      --border: #d8e0ee;
-      --danger: #dc2626;
-      --success: #16a34a;
-      --shadow: 0 8px 20px rgba(10,20,40,.08);
-    }
-  }
-  * { box-sizing: border-box; }
-  html, body { height: 100%; }
-  body {
-    margin: 0;
-    font-family: var(--font);
-    color: var(--text);
-    background: radial-gradient(1200px 600px at 20% -10%, rgba(60,162,255,.15), transparent 60%),
-                radial-gradient(900px 500px at 95% 0%, rgba(45,212,191,.2), transparent 60%),
-                var(--bg);
-    min-height: 100vh;
-  }
-  header {
-    position: sticky; top: 0; z-index: 5;
-    backdrop-filter: blur(8px);
-    background: color-mix(in oklab, var(--bg) 85%, transparent);
-    border-bottom: 1px solid var(--border);
-  }
-  .wrap {
-    max-width: 1200px;
-    margin: 0 auto; padding: 16px;
-  }
-  .bar {
-    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-  }
-  .title { font-weight: 800; letter-spacing: .3px; font-size: 20px; display:flex; align-items:center; gap:10px; }
-  .title .badge { font-size: 12px; padding: 2px 8px; background: var(--subpanel); border:1px solid var(--border); border-radius: 999px; color: var(--muted); }
-  .spacer { flex: 1; }
-  .btn, button, .chip {
-    appearance: none; border:1px solid var(--border); background: var(--panel); color: var(--text);
-    padding: 10px 14px; border-radius: var(--radius-sm); cursor: pointer; font-weight: 600;
-    transition: transform .04s ease, background .2s ease, border-color .2s ease, color .2s ease, box-shadow .2s ease;
-  }
-  .btn:hover { transform: translateY(-1px); }
-  .btn.primary { background: linear-gradient(135deg, var(--accent), #7cc6ff); color: white; border-color: transparent; }
-  .btn.success { background: linear-gradient(135deg, var(--success), #4ade80); color: white; border-color: transparent; }
-  .btn.danger { background: linear-gradient(135deg, var(--danger), #fb7185); color:white; border-color: transparent; }
-  .btn.ghost { background: var(--subpanel); }
-  .icon { opacity: .9; margin-right: 6px; }
-  .grid {
-    display: grid; gap: 16px; padding: 16px;
-    grid-template-columns: 1fr 1fr;
-  }
-  @media (max-width: 980px) {
-    .grid { grid-template-columns: 1fr; }
-  }
-  .pane {
-    background: color-mix(in oklab, var(--panel) 87%, transparent);
-    border:1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
-    overflow: hidden; display:flex; flex-direction: column; min-height: 320px;
-  }
-  .pane h3 {
-    margin: 0; padding: 12px 14px; font-size: 14px; border-bottom: 1px solid var(--border);
-    display:flex; align-items:center; gap:10px; background: color-mix(in oklab, var(--panel) 94%, transparent);
-  }
-  .stats {
-    display:flex; gap: 10px; margin-left: auto; color: var(--muted); font-size: 12px; flex-wrap: wrap;
-  }
-  .stats .pill { background: var(--subpanel); border:1px solid var(--border); padding: 2px 8px; border-radius: 999px; }
-  textarea {
-    width: 100%; flex:1; resize: vertical; min-height: 200px;
-    background: transparent; color: var(--text); border: none; outline: none;
-    padding: 14px; font-size: 15px; line-height: 1.5; font-family: var(--mono);
-  }
-  .controls {
-    border-top: 1px solid var(--border);
-    display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; background: color-mix(in oklab, var(--panel) 94%, transparent);
-  }
-  .options {
-    background: color-mix(in oklab, var(--panel) 87%, transparent);
-    border:1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
-  }
-  .opt-wrap {
-    display: grid; gap: 12px; grid-template-columns: repeat(12, 1fr);
-    padding: 12px; border-top: 1px dashed var(--border);
-  }
-  .group { grid-column: span 12; background: var(--subpanel); border:1px solid var(--border); border-radius: var(--radius-sm); padding: 10px; }
-  .group h4 { margin: 0 0 8px; font-size: 13px; color: var(--muted); letter-spacing: .2px; }
-  .row { display:flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-  label.chk {
-    display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border:1px solid var(--border);
-    border-radius: 10px; background: color-mix(in oklab, var(--panel) 94%, transparent); cursor: pointer; font-size: 13px;
-  }
-  input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
-  select, input[type="number"], input[type="text"] {
-    padding: 8px 10px; border:1px solid var(--border); border-radius: 10px; background: var(--panel); color: var(--text);
-  }
-  details { border-top: 1px solid var(--border); }
-  details > summary {
-    list-style: none; cursor: pointer; padding: 10px 12px; font-weight: 700; color: var(--muted);
-  }
-  details[open] > summary { color: var(--text); }
-  .help { color: var(--muted); font-size: 12px; }
-  .footer {
-    opacity: .8; color: var(--muted); text-align: center; padding: 20px 10px; font-size: 12px;
-  }
-  .kbd {
-    font-family: var(--mono); background: var(--subpanel); padding: 2px 6px; border-radius: 6px; border:1px solid var(--border);
-  }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Cleaner Pro</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --primary-light: #818cf8;
+            --secondary: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --info: #3b82f6;
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --border-color: #475569;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+            --radius: 12px;
+            --radius-sm: 8px;
+        }
+
+        [data-theme="light"] {
+            --bg-primary: #f8fafc;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #e2e8f0;
+            --text-primary: #1e293b;
+            --text-secondary: #475569;
+            --text-muted: #94a3b8;
+            --border-color: #cbd5e1;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.15);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            transition: background 0.3s, color 0.3s;
+        }
+
+        /* Header */
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0.875rem 1.5rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: var(--shadow);
+        }
+
+        .header-content {
+            max-width: 1800px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.625rem;
+        }
+
+        .logo i {
+            font-size: 1.5rem;
+            color: var(--primary);
+        }
+
+        .logo h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .auto-apply-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: var(--bg-tertiary);
+            padding: 0.375rem 0.75rem;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-color);
+        }
+
+        .auto-apply-toggle.active {
+            border-color: var(--secondary);
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .auto-apply-toggle label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+            user-select: none;
+        }
+
+        .auto-apply-toggle.active label {
+            color: var(--secondary);
+        }
+
+        .toggle-switch {
+            width: 36px;
+            height: 20px;
+            appearance: none;
+            background: var(--bg-primary);
+            border-radius: 10px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .toggle-switch::before {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--text-muted);
+            top: 2px;
+            left: 2px;
+            transition: all 0.3s ease;
+        }
+
+        .toggle-switch:checked {
+            background: var(--secondary);
+        }
+
+        .toggle-switch:checked::before {
+            left: 18px;
+            background: white;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 0.375rem;
+        }
+
+        .icon-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-color);
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            font-size: 0.875rem;
+        }
+
+        .icon-btn:hover {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+
+        .icon-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .icon-btn:disabled:hover {
+            background: var(--bg-tertiary);
+            border-color: var(--border-color);
+            color: var(--text-primary);
+        }
+
+        /* Main Container */
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+            padding: 1rem;
+            display: grid;
+            grid-template-columns: 260px 1fr 280px;
+            gap: 1rem;
+            min-height: calc(100vh - 70px);
+        }
+
+        /* Sidebar */
+        .sidebar {
+            background: var(--bg-secondary);
+            border-radius: var(--radius);
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            height: fit-content;
+            position: sticky;
+            top: 80px;
+            max-height: calc(100vh - 100px);
+            overflow-y: auto;
+        }
+
+        .sidebar-section {
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-section:last-child {
+            border-bottom: none;
+        }
+
+        .sidebar-header {
+            padding: 0.75rem;
+            background: var(--bg-tertiary);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        .sidebar-header:hover {
+            background: var(--border-color);
+        }
+
+        .sidebar-header h3 {
+            font-size: 0.75rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .sidebar-header i.toggle {
+            transition: transform 0.3s ease;
+            font-size: 0.625rem;
+        }
+
+        .sidebar-header.collapsed i.toggle {
+            transform: rotate(-90deg);
+        }
+
+        .sidebar-content {
+            padding: 0.375rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.25rem;
+        }
+
+        .sidebar-content.single-col {
+            grid-template-columns: 1fr;
+        }
+
+        .sidebar-content.collapsed {
+            display: none;
+        }
+
+        .action-btn {
+            padding: 0.5rem 0.5rem;
+            border-radius: 6px;
+            border: 1px solid transparent;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 0.6875rem;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .action-btn:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .action-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary-light);
+        }
+
+        .action-btn i {
+            width: 14px;
+            text-align: center;
+            font-size: 0.625rem;
+            flex-shrink: 0;
+        }
+
+        /* Main Editor */
+        .editor-area {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        /* Pipeline Bar */
+        .pipeline-bar {
+            background: var(--bg-secondary);
+            border-radius: var(--radius);
+            border: 1px solid var(--border-color);
+            padding: 0.75rem;
+        }
+
+        .pipeline-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .pipeline-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .pipeline-title .count {
+            background: var(--primary);
+            color: white;
+            font-size: 0.625rem;
+            padding: 0.125rem 0.375rem;
+            border-radius: 10px;
+            min-width: 18px;
+            text-align: center;
+        }
+
+        .pipeline-actions {
+            display: flex;
+            gap: 0.375rem;
+        }
+
+        .pipeline-btn {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            border: none;
+            font-size: 0.625rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            transition: all 0.15s ease;
+        }
+
+        .pipeline-btn.primary {
+            background: var(--secondary);
+            color: white;
+        }
+
+        .pipeline-btn.secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .pipeline-btn.danger {
+            background: transparent;
+            color: var(--danger);
+        }
+
+        .pipeline-btn:hover {
+            opacity: 0.85;
+            transform: translateY(-1px);
+        }
+
+        .pipeline-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.375rem;
+            min-height: 28px;
+            align-items: center;
+        }
+
+        .pipeline-empty {
+            font-size: 0.6875rem;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .pipeline-item {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.625rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+            animation: popIn 0.2s ease;
+            cursor: grab;
+        }
+
+        .pipeline-item.dragging {
+            opacity: 0.5;
+        }
+
+        .pipeline-item .op-number {
+            background: rgba(255,255,255,0.2);
+            padding: 0.0625rem 0.25rem;
+            border-radius: 3px;
+            font-size: 0.5625rem;
+        }
+
+        .pipeline-item .remove-op {
+            cursor: pointer;
+            opacity: 0.7;
+            font-size: 0.5rem;
+            transition: opacity 0.15s;
+            margin-left: 0.125rem;
+        }
+
+        .pipeline-item .remove-op:hover {
+            opacity: 1;
+        }
+
+        @keyframes popIn {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        /* Processing indicator */
+        .processing-indicator {
+            display: none;
+            align-items: center;
+            gap: 0.375rem;
+            font-size: 0.6875rem;
+            color: var(--primary);
+        }
+
+        .processing-indicator.active {
+            display: flex;
+        }
+
+        .processing-indicator .spinner {
+            width: 12px;
+            height: 12px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Toolbar */
+        .editor-toolbar {
+            background: var(--bg-secondary);
+            border-radius: var(--radius);
+            border: 1px solid var(--border-color);
+            padding: 0.5rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.375rem;
+            align-items: center;
+        }
+
+        .toolbar-group {
+            display: flex;
+            gap: 0.25rem;
+            padding-right: 0.625rem;
+            border-right: 1px solid var(--border-color);
+        }
+
+        .toolbar-group:last-child {
+            border-right: none;
+            padding-right: 0;
+        }
+
+        .toolbar-btn {
+            padding: 0.375rem 0.625rem;
+            border-radius: 6px;
+            border: none;
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            transition: all 0.15s ease;
+        }
+
+        .toolbar-btn:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .toolbar-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* Find Replace */
+        .find-replace-bar {
+            background: var(--bg-secondary);
+            border-radius: var(--radius);
+            border: 1px solid var(--border-color);
+            padding: 0.75rem;
+            display: none;
+            gap: 0.5rem;
+        }
+
+        .find-replace-bar.active {
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        .find-replace-bar input {
+            flex: 1;
+            min-width: 150px;
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 0.8125rem;
+        }
+
+        .find-replace-bar input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .find-replace-bar .options {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .find-replace-bar label {
+            font-size: 0.6875rem;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            cursor: pointer;
+        }
+
+        .find-replace-bar label input[type="checkbox"] {
+            accent-color: var(--primary);
+        }
+
+        .find-replace-bar .match-info {
+            font-size: 0.6875rem;
+            color: var(--text-muted);
+        }
+
+        /* Editor Container */
+        .editor-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+            flex: 1;
+        }
+
+        .editor-panel {
+            background: var(--bg-secondary);
+            border-radius: var(--radius);
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            min-height: 400px;
+            transition: border-color 0.2s;
+        }
+
+        .editor-panel.input-panel {
+            border-color: var(--info);
+        }
+
+        .editor-panel.output-panel {
+            border-color: var(--secondary);
+        }
+
+        .panel-header {
+            padding: 0.625rem 0.75rem;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-radius: var(--radius) var(--radius) 0 0;
+        }
+
+        .editor-panel.input-panel .panel-header {
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .editor-panel.output-panel .panel-header {
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .panel-header h3 {
+            font-size: 0.75rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+        }
+
+        .panel-header h3 i {
+            font-size: 0.875rem;
+        }
+
+        .editor-panel.input-panel .panel-header h3 i {
+            color: var(--info);
+        }
+
+        .editor-panel.output-panel .panel-header h3 i {
+            color: var(--secondary);
+        }
+
+        .panel-actions {
+            display: flex;
+            gap: 0.25rem;
+        }
+
+        .panel-btn {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            border: none;
+            background: rgba(255,255,255,0.1);
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 0.625rem;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            transition: all 0.15s ease;
+        }
+
+        .panel-btn:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .text-area {
+            flex: 1;
+            width: 100%;
+            padding: 0.75rem;
+            border: none;
+            background: transparent;
+            color: var(--text-primary);
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.8125rem;
+            line-height: 1.6;
+            resize: none;
+            outline: none;
+        }
+
+        .text-area::placeholder {
+            color: var(--text-muted);
+        }
+
+        /* Right Panel */
+        .right-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            position: sticky;
+            top: 80px;
+            height: fit-content;
+        }
+
+        .panel-card {
+            background: var(--bg-secondary);
+            border-radius: var(--radius);
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+
+        .panel-card-header {
+            padding: 0.625rem 0.75rem;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-card-header h3 {
+            font-size: 0.75rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+        }
+
+        /* Stats */
+        .stats-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .stats-tab {
+            flex: 1;
+            padding: 0.5rem;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 0.6875rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            font-weight: 500;
+        }
+
+        .stats-tab:hover {
+            color: var(--text-primary);
+            background: var(--bg-tertiary);
+        }
+
+        .stats-tab.active {
+            color: var(--primary);
+            border-bottom: 2px solid var(--primary);
+        }
+
+        .stats-grid {
+            padding: 0.5rem;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.375rem;
+        }
+
+        .stat-item {
+            background: var(--bg-primary);
+            border-radius: 6px;
+            padding: 0.5rem;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            font-size: 0.5625rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Diff Stats */
+        .diff-stats {
+            padding: 0.5rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.375rem;
+        }
+
+        .diff-stat {
+            background: var(--bg-primary);
+            border-radius: 6px;
+            padding: 0.5rem;
+            text-align: center;
+        }
+
+        .diff-stat.positive .diff-value {
+            color: var(--secondary);
+        }
+
+        .diff-stat.negative .diff-value {
+            color: var(--danger);
+        }
+
+        .diff-value {
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .diff-label {
+            font-size: 0.5625rem;
+            color: var(--text-muted);
+        }
+
+        /* History */
+        .history-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background 0.15s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .history-item:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .history-item:last-child {
+            border-bottom: none;
+        }
+
+        .history-info {
+            overflow: hidden;
+        }
+
+        .history-action {
+            font-size: 0.6875rem;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .history-time {
+            font-size: 0.5625rem;
+            color: var(--text-muted);
+        }
+
+        .history-restore {
+            padding: 0.1875rem 0.375rem;
+            border-radius: 4px;
+            border: none;
+            background: var(--primary);
+            color: white;
+            font-size: 0.5625rem;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.15s ease;
+            flex-shrink: 0;
+        }
+
+        .history-item:hover .history-restore {
+            opacity: 1;
+        }
+
+        .history-empty {
+            padding: 1.5rem;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.6875rem;
+        }
+
+        /* Toast */
+        .toast-container {
+            position: fixed;
+            bottom: 1.5rem;
+            right: 1.5rem;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .toast {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 0.75rem 1rem;
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            animation: slideIn 0.25s ease;
+            max-width: 300px;
+            font-size: 0.8125rem;
+        }
+
+        .toast.success { border-left: 3px solid var(--secondary); }
+        .toast.error { border-left: 3px solid var(--danger); }
+        .toast.warning { border-left: 3px solid var(--warning); }
+        .toast.info { border-left: 3px solid var(--info); }
+
+        .toast i { font-size: 1rem; }
+        .toast.success i { color: var(--secondary); }
+        .toast.error i { color: var(--danger); }
+        .toast.warning i { color: var(--warning); }
+        .toast.info i { color: var(--info); }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Modals */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 1rem;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--bg-secondary);
+            border-radius: var(--radius);
+            border: 1px solid var(--border-color);
+            max-width: 480px;
+            width: 100%;
+            max-height: 85vh;
+            overflow: hidden;
+            animation: modalIn 0.25s ease;
+        }
+
+        @keyframes modalIn {
+            from { transform: scale(0.95) translateY(-10px); opacity: 0; }
+            to { transform: scale(1) translateY(0); opacity: 1; }
+        }
+
+        .modal-header {
+            padding: 0.875rem 1rem;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            font-size: 0.9375rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .modal-close {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+        }
+
+        .modal-close:hover {
+            background: var(--danger);
+            color: white;
+        }
+
+        .modal-body {
+            padding: 1rem;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+
+        .modal-footer {
+            padding: 0.75rem 1rem;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            border: none;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+            transition: all 0.15s ease;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border-color);
+        }
+
+        .form-group {
+            margin-bottom: 0.875rem;
+        }
+
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 500;
+            margin-bottom: 0.375rem;
+            color: var(--text-secondary);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 0.8125rem;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .form-check {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+
+        .form-check input {
+            accent-color: var(--primary);
+        }
+
+        /* Presets */
+        .preset-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+        }
+
+        .preset-item {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 0.75rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .preset-item:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        .preset-item h4 {
+            font-size: 0.75rem;
+            margin-bottom: 0.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+        }
+
+        .preset-item p {
+            font-size: 0.625rem;
+            color: var(--text-muted);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+
+        /* Responsive */
+        @media (max-width: 1300px) {
+            .container {
+                grid-template-columns: 240px 1fr;
+            }
+            .right-panel {
+                display: none;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+            .sidebar {
+                position: static;
+                max-height: none;
+            }
+            .sidebar-content {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            .editor-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .header-content {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .header-controls {
+                justify-content: center;
+            }
+            .sidebar-content {
+                grid-template-columns: 1fr 1fr;
+            }
+            .preset-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* File input */
+        #fileInput {
+            display: none;
+        }
+    </style>
 </head>
 <body>
-  <header>
-    <div class="wrap bar">
-      <div class="title">
-        🧼 Text Cleaner
-        <span class="badge">offline • privacy‑first</span>
-      </div>
-      <div class="spacer"></div>
-      <label class="chk"><input type="checkbox" id="liveMode" checked> Live clean</label>
-      <button class="btn ghost" id="resetOptions" title="Reset all options">Reset options</button>
-      <button class="btn" id="themeToggle">Toggle theme</button>
-    </div>
-  </header>
-
-  <div class="wrap">
-    <div class="grid">
-      <section class="pane" id="inputPane">
-        <h3>
-          Input
-          <span class="stats" id="inStats">
-            <span class="pill" title="Characters">0 chars</span>
-            <span class="pill" title="Words">0 words</span>
-            <span class="pill" title="Lines">0 lines</span>
-          </span>
-        </h3>
-        <textarea id="input" placeholder="Paste or type text here..."></textarea>
-        <div class="controls">
-          <button class="btn" id="pasteBtn">Paste</button>
-          <button class="btn ghost" id="clearBtn">Clear</button>
-          <label class="btn ghost" title="Import .txt">
-            <input type="file" id="fileInput" accept=".txt,.csv,.md,.log,.json,.html,.xml" hidden>
-            Import file
-          </label>
-          <div class="spacer"></div>
-          <button class="btn primary" id="applyBtn" title="Apply cleaning (Ctrl/Cmd+Enter)">Apply</button>
-        </div>
-      </section>
-
-      <section class="pane" id="outputPane">
-        <h3>
-          Output
-          <span class="stats" id="outStats">
-            <span class="pill">0 chars</span>
-            <span class="pill">0 words</span>
-            <span class="pill">0 lines</span>
-          </span>
-        </h3>
-        <textarea id="output" placeholder="Cleaned text will appear here..." readonly></textarea>
-        <div class="controls">
-          <button class="btn success" id="copyBtn">Copy</button>
-          <button class="btn ghost" id="swapBtn" title="Move output to input">Send to input</button>
-          <button class="btn ghost" id="downloadBtn">Download .txt</button>
-          <button class="btn ghost" id="shareBtn">Share</button>
-        </div>
-      </section>
-    </div>
-
-    <section class="options">
-      <div class="opt-wrap">
-        <div class="group">
-          <h4>Whitespace</h4>
-          <div class="row">
-            <label class="chk"><input type="checkbox" id="trim"> Trim ends</label>
-            <label class="chk"><input type="checkbox" id="trimLines"> Trim each line</label>
-            <label class="chk"><input type="checkbox" id="collapseSpaces" checked> Collapse multiple spaces</label>
-            <label class="chk"><input type="checkbox" id="normalizeEOL" checked> Normalize line endings</label>
-            <label class="chk"><input type="checkbox" id="removeEmptyLines"> Remove empty lines</label>
-            <label class="chk"><input type="checkbox" id="collapseBlankLines" checked> Collapse blank lines</label>
-            <label class="chk"><input type="checkbox" id="replaceTabs"> Replace tabs with
-              <input type="number" id="tabSize" min="1" max="8" value="2" style="width:64px;margin-left:6px;">
-              spaces
-            </label>
-          </div>
-        </div>
-
-        <div class="group">
-          <h4>Characters</h4>
-          <div class="row">
-            <label class="chk"><input type="checkbox" id="removePunct"> Remove punctuation</label>
-            <label class="chk"><input type="checkbox" id="removeDigits"> Remove digits</label>
-            <label class="chk"><input type="checkbox" id="removeEmojis"> Remove emojis</label>
-            <label class="chk"><input type="checkbox" id="removeDiacritics"> Remove diacritics</label>
-            <label class="chk"><input type="checkbox" id="asciiOnly"> Keep ASCII only</label>
-            <label class="chk"><input type="checkbox" id="stripHtml"> Strip HTML tags</label>
-            <label class="chk"><input type="checkbox" id="decodeHtml"> Decode HTML entities</label>
-          </div>
-        </div>
-
-        <div class="group">
-          <h4>Case</h4>
-          <div class="row">
-            <label class="chk"><input type="radio" name="case" value="none" checked> None</label>
-            <label class="chk"><input type="radio" name="case" value="lower"> lower</label>
-            <label class="chk"><input type="radio" name="case" value="upper"> UPPER</label>
-            <label class="chk"><input type="radio" name="case" value="title"> Title Case</label>
-            <label class="chk"><input type="radio" name="case" value="sentence"> Sentence case</label>
-          </div>
-        </div>
-
-        <div class="group">
-          <h4>Lines</h4>
-          <div class="row">
-            <label class="chk"><input type="checkbox" id="removeBullets"> Remove bullets/numbering</label>
-            <label class="chk"><input type="checkbox" id="uniqueLines"> Unique lines</label>
-            <label class="chk"><input type="checkbox" id="uniqueIgnoreCase" checked> Unique: ignore case</label>
-            <label class="chk">Sort
-              <select id="sortLines" style="margin-left:6px;">
-                <option value="none">None</option>
-                <option value="asc">Ascending</option>
-                <option value="desc">Descending</option>
-              </select>
-            </label>
-          </div>
-        </div>
-
-        <div class="group">
-          <h4>Words</h4>
-          <div class="row">
-            <label class="chk"><input type="checkbox" id="removeStopwords"> Remove English stopwords</label>
-            <input type="text" id="customStopwords" placeholder="Custom stopwords (comma-separated)" style="min-width:280px;">
-          </div>
-          <div class="help">Tip: Custom stopwords are case-insensitive. Example: foo,bar,baz</div>
-        </div>
-
-        <div class="group">
-          <h4>Transform</h4>
-          <div class="row">
-            <label class="chk"><input type="checkbox" id="slugify"> slugify</label>
-            <label class="chk"><input type="checkbox" id="snake"> snake_case</label>
-            <label class="chk"><input type="checkbox" id="camel"> camelCase</label>
-            <label class="chk"><input type="checkbox" id="kebab"> kebab-case</label>
-          </div>
-          <div class="help">Note: These transforms are mutually exclusive; the first checked (left-to-right) wins.</div>
-        </div>
-      </div>
-
-      <details>
-        <summary>Advanced options</summary>
-        <div class="opt-wrap">
-          <div class="group">
-            <h4>HTML & Entities</h4>
-            <div class="row">
-              <label class="chk"><input type="checkbox" id="encodeHtml"> Encode HTML entities</label>
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <i class="fas fa-wand-magic-sparkles"></i>
+                <h1>Text Cleaner Pro</h1>
             </div>
-          </div>
-          <div class="group">
-            <h4>Find & Replace</h4>
-            <div class="row">
-              <input type="text" id="findText" placeholder="Find (supports regex e.g., \\d+)">
-              <input type="text" id="replaceText" placeholder="Replace with">
-              <label class="chk"><input type="checkbox" id="regexMode"> Regex</label>
-              <label class="chk"><input type="checkbox" id="caseInsensitive" checked> Case-insensitive</label>
-              <label class="chk"><input type="checkbox" id="multiline"> Multiline</label>
-              <button class="btn" id="findReplaceBtn">Run replace</button>
+            <div class="header-controls">
+                <div class="auto-apply-toggle active" id="autoApplyToggle">
+                    <label>
+                        <input type="checkbox" class="toggle-switch" id="autoApply" checked>
+                        <i class="fas fa-sync-alt"></i>
+                        Auto Apply
+                    </label>
+                </div>
+                <div class="processing-indicator" id="processingIndicator">
+                    <div class="spinner"></div>
+                    <span>Processing...</span>
+                </div>
             </div>
-          </div>
-          <div class="group">
-            <h4>Live Preview Controls</h4>
-            <div class="row">
-              <label class="chk"><input type="checkbox" id="autoSelectOutput" checked> Auto-select output on copy</label>
-              <label class="chk"><input type="checkbox" id="autoScroll" checked> Auto-scroll to output</label>
+            <div class="header-actions">
+                <button class="icon-btn" id="undoBtn" title="Undo (Ctrl+Z)" disabled>
+                    <i class="fas fa-undo"></i>
+                </button>
+                <button class="icon-btn" id="redoBtn" title="Redo (Ctrl+Y)" disabled>
+                    <i class="fas fa-redo"></i>
+                </button>
+                <button class="icon-btn" id="presetsBtn" title="Presets">
+                    <i class="fas fa-wand-sparkles"></i>
+                </button>
+                <button class="icon-btn" id="themeToggle" title="Toggle Theme">
+                    <i class="fas fa-moon"></i>
+                </button>
             </div>
-          </div>
         </div>
-      </details>
-    </section>
+    </header>
 
-    <div class="footer">
-      Keyboard: <span class="kbd">Ctrl/Cmd + Enter</span> Apply • <span class="kbd">Ctrl/Cmd + C</span> Copy Output
-      • Made with ❤️ — Your text never leaves your device.
+    <div class="container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-header" data-section="whitespace">
+                    <h3><i class="fas fa-align-left"></i> Whitespace</h3>
+                    <i class="fas fa-chevron-down toggle"></i>
+                </div>
+                <div class="sidebar-content" data-content="whitespace">
+                    <button class="action-btn" data-action="trimWhitespace"><i class="fas fa-compress-alt"></i> Trim</button>
+                    <button class="action-btn" data-action="removeExtraSpaces"><i class="fas fa-text-width"></i> Extra Spaces</button>
+                    <button class="action-btn" data-action="removeAllSpaces"><i class="fas fa-times"></i> All Spaces</button>
+                    <button class="action-btn" data-action="removeLeading"><i class="fas fa-outdent"></i> Leading</button>
+                    <button class="action-btn" data-action="removeTrailing"><i class="fas fa-indent"></i> Trailing</button>
+                    <button class="action-btn" data-action="normalizeSpace"><i class="fas fa-compress"></i> Normalize</button>
+                    <button class="action-btn" data-action="tabsToSpaces"><i class="fas fa-arrow-right"></i> Tabs→Spaces</button>
+                    <button class="action-btn" data-action="spacesToTabs"><i class="fas fa-arrow-left"></i> Spaces→Tabs</button>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-header" data-section="lines">
+                    <h3><i class="fas fa-bars"></i> Lines</h3>
+                    <i class="fas fa-chevron-down toggle"></i>
+                </div>
+                <div class="sidebar-content" data-content="lines">
+                    <button class="action-btn" data-action="removeEmptyLines"><i class="fas fa-eraser"></i> Empty Lines</button>
+                    <button class="action-btn" data-action="removeDuplicates"><i class="fas fa-clone"></i> Duplicates</button>
+                    <button class="action-btn" data-action="removeLineBreaks"><i class="fas fa-grip-lines"></i> Line Breaks</button>
+                    <button class="action-btn" data-action="mergeLines"><i class="fas fa-compress-arrows-alt"></i> Merge</button>
+                    <button class="action-btn" data-action="sortAZ"><i class="fas fa-sort-alpha-down"></i> Sort A-Z</button>
+                    <button class="action-btn" data-action="sortZA"><i class="fas fa-sort-alpha-up"></i> Sort Z-A</button>
+                    <button class="action-btn" data-action="sortLength"><i class="fas fa-sort-numeric-down"></i> By Length</button>
+                    <button class="action-btn" data-action="sortLengthDesc"><i class="fas fa-sort-numeric-up"></i> Length Desc</button>
+                    <button class="action-btn" data-action="reverse"><i class="fas fa-exchange-alt"></i> Reverse</button>
+                    <button class="action-btn" data-action="shuffle"><i class="fas fa-random"></i> Shuffle</button>
+                    <button class="action-btn" data-action="addNumbers"><i class="fas fa-list-ol"></i> Add Numbers</button>
+                    <button class="action-btn" data-action="removeNumbers"><i class="fas fa-list"></i> Remove #s</button>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-header" data-section="case">
+                    <h3><i class="fas fa-font"></i> Case</h3>
+                    <i class="fas fa-chevron-down toggle"></i>
+                </div>
+                <div class="sidebar-content" data-content="case">
+                    <button class="action-btn" data-action="uppercase"><i class="fas fa-arrow-up"></i> UPPER</button>
+                    <button class="action-btn" data-action="lowercase"><i class="fas fa-arrow-down"></i> lower</button>
+                    <button class="action-btn" data-action="titleCase"><i class="fas fa-heading"></i> Title</button>
+                    <button class="action-btn" data-action="sentenceCase"><i class="fas fa-paragraph"></i> Sentence</button>
+                    <button class="action-btn" data-action="camelCase"><i class="fas fa-code"></i> camel</button>
+                    <button class="action-btn" data-action="pascalCase"><i class="fas fa-code"></i> Pascal</button>
+                    <button class="action-btn" data-action="snakeCase"><i class="fas fa-code"></i> snake</button>
+                    <button class="action-btn" data-action="kebabCase"><i class="fas fa-code"></i> kebab</button>
+                    <button class="action-btn" data-action="toggleCase"><i class="fas fa-sync"></i> Toggle</button>
+                    <button class="action-btn" data-action="alternating"><i class="fas fa-wave-square"></i> AlTeRn</button>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-header" data-section="remove">
+                    <h3><i class="fas fa-trash-alt"></i> Remove</h3>
+                    <i class="fas fa-chevron-down toggle"></i>
+                </div>
+                <div class="sidebar-content" data-content="remove">
+                    <button class="action-btn" data-action="removeDigits"><i class="fas fa-hashtag"></i> Numbers</button>
+                    <button class="action-btn" data-action="removeLetters"><i class="fas fa-font"></i> Letters</button>
+                    <button class="action-btn" data-action="removePunctuation"><i class="fas fa-exclamation"></i> Punctuation</button>
+                    <button class="action-btn" data-action="removeSpecial"><i class="fas fa-at"></i> Special</button>
+                    <button class="action-btn" data-action="removeHTML"><i class="fas fa-code"></i> HTML</button>
+                    <button class="action-btn" data-action="removeURLs"><i class="fas fa-link"></i> URLs</button>
+                    <button class="action-btn" data-action="removeEmails"><i class="fas fa-envelope"></i> Emails</button>
+                    <button class="action-btn" data-action="removeEmojis"><i class="fas fa-smile"></i> Emojis</button>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-header collapsed" data-section="add">
+                    <h3><i class="fas fa-plus"></i> Add/Wrap</h3>
+                    <i class="fas fa-chevron-down toggle"></i>
+                </div>
+                <div class="sidebar-content collapsed single-col" data-content="add">
+                    <button class="action-btn" data-action="addPrefix"><i class="fas fa-chevron-left"></i> Add Prefix...</button>
+                    <button class="action-btn" data-action="addSuffix"><i class="fas fa-chevron-right"></i> Add Suffix...</button>
+                    <button class="action-btn" data-action="wrapLines"><i class="fas fa-compress"></i> Wrap Lines...</button>
+                    <button class="action-btn" data-action="addQuotes"><i class="fas fa-quote-right"></i> 'Single Quotes'</button>
+                    <button class="action-btn" data-action="addDoubleQuotes"><i class="fas fa-quote-left"></i> "Double Quotes"</button>
+                    <button class="action-btn" data-action="addBrackets"><i class="fas fa-brackets-square"></i> [Brackets]</button>
+                    <button class="action-btn" data-action="addParens"><i class="fas fa-brackets-round"></i> (Parentheses)</button>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-header collapsed" data-section="extract">
+                    <h3><i class="fas fa-filter"></i> Extract</h3>
+                    <i class="fas fa-chevron-down toggle"></i>
+                </div>
+                <div class="sidebar-content collapsed" data-content="extract">
+                    <button class="action-btn" data-action="extractEmails"><i class="fas fa-envelope"></i> Emails</button>
+                    <button class="action-btn" data-action="extractURLs"><i class="fas fa-link"></i> URLs</button>
+                    <button class="action-btn" data-action="extractNumbers"><i class="fas fa-hashtag"></i> Numbers</button>
+                    <button class="action-btn" data-action="extractWords"><i class="fas fa-font"></i> Words</button>
+                    <button class="action-btn" data-action="extractHashtags"><i class="fab fa-hashtag"></i> #Hashtags</button>
+                    <button class="action-btn" data-action="extractMentions"><i class="fas fa-at"></i> @Mentions</button>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-header collapsed" data-section="encode">
+                    <h3><i class="fas fa-lock"></i> Encode/Decode</h3>
+                    <i class="fas fa-chevron-down toggle"></i>
+                </div>
+                <div class="sidebar-content collapsed" data-content="encode">
+                    <button class="action-btn" data-action="base64Encode"><i class="fas fa-lock"></i> Base64 Enc</button>
+                    <button class="action-btn" data-action="base64Decode"><i class="fas fa-unlock"></i> Base64 Dec</button>
+                    <button class="action-btn" data-action="urlEncode"><i class="fas fa-lock"></i> URL Enc</button>
+                    <button class="action-btn" data-action="urlDecode"><i class="fas fa-unlock"></i> URL Dec</button>
+                    <button class="action-btn" data-action="htmlEncode"><i class="fas fa-lock"></i> HTML Enc</button>
+                    <button class="action-btn" data-action="htmlDecode"><i class="fas fa-unlock"></i> HTML Dec</button>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-header collapsed" data-section="format">
+                    <h3><i class="fas fa-code"></i> Format</h3>
+                    <i class="fas fa-chevron-down toggle"></i>
+                </div>
+                <div class="sidebar-content collapsed" data-content="format">
+                    <button class="action-btn" data-action="formatJSON"><i class="fas fa-brackets-curly"></i> JSON Pretty</button>
+                    <button class="action-btn" data-action="minifyJSON"><i class="fas fa-compress"></i> JSON Minify</button>
+                    <button class="action-btn" data-action="formatXML"><i class="fas fa-code"></i> XML Format</button>
+                    <button class="action-btn" data-action="formatCSS"><i class="fab fa-css3"></i> CSS Format</button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Editor -->
+        <main class="editor-area">
+            <!-- Pipeline -->
+            <div class="pipeline-bar">
+                <div class="pipeline-header">
+                    <div class="pipeline-title">
+                        <i class="fas fa-layer-group"></i>
+                        Operations Pipeline
+                        <span class="count" id="pipelineCount">0</span>
+                    </div>
+                    <div class="pipeline-actions">
+                        <button class="pipeline-btn secondary" id="applyNowBtn" title="Apply all operations now">
+                            <i class="fas fa-play"></i> Apply
+                        </button>
+                        <button class="pipeline-btn danger" id="clearPipelineBtn" title="Clear all operations">
+                            <i class="fas fa-times"></i> Clear
+                        </button>
+                    </div>
+                </div>
+                <div class="pipeline-items" id="pipelineItems">
+                    <span class="pipeline-empty">Click operations to add them to the pipeline</span>
+                </div>
+            </div>
+
+            <!-- Toolbar -->
+            <div class="editor-toolbar">
+                <div class="toolbar-group">
+                    <button class="toolbar-btn" id="importBtn"><i class="fas fa-file-import"></i> Import</button>
+                    <button class="toolbar-btn" id="exportBtn"><i class="fas fa-file-export"></i> Export</button>
+                </div>
+                <div class="toolbar-group">
+                    <button class="toolbar-btn" id="findReplaceBtn"><i class="fas fa-search"></i> Find/Replace</button>
+                </div>
+                <div class="toolbar-group">
+                    <button class="toolbar-btn" id="swapBtn" title="Swap input and output"><i class="fas fa-exchange-alt"></i></button>
+                    <button class="toolbar-btn" id="clearAllBtn" title="Clear everything"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>
+
+            <!-- Find/Replace -->
+            <div class="find-replace-bar" id="findReplaceBar">
+                <input type="text" id="findInput" placeholder="Find...">
+                <input type="text" id="replaceInput" placeholder="Replace with...">
+                <button class="btn btn-primary" id="replaceBtn"><i class="fas fa-sync"></i> Replace All</button>
+                <div class="options">
+                    <label><input type="checkbox" id="caseSensitive"> Case</label>
+                    <label><input type="checkbox" id="wholeWord"> Word</label>
+                    <label><input type="checkbox" id="useRegex"> Regex</label>
+                    <span class="match-info" id="matchInfo"></span>
+                </div>
+            </div>
+
+            <!-- Editor Panels -->
+            <div class="editor-container">
+                <div class="editor-panel input-panel">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-edit"></i> Input</h3>
+                        <div class="panel-actions">
+                            <button class="panel-btn" id="pasteBtn"><i class="fas fa-paste"></i> Paste</button>
+                            <button class="panel-btn" id="clearInputBtn"><i class="fas fa-eraser"></i> Clear</button>
+                            <button class="panel-btn" id="copyInputBtn"><i class="fas fa-copy"></i> Copy</button>
+                        </div>
+                    </div>
+                    <textarea class="text-area" id="inputText" placeholder="Type or paste your text here..."></textarea>
+                </div>
+
+                <div class="editor-panel output-panel">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-sparkles"></i> Output</h3>
+                        <div class="panel-actions">
+                            <button class="panel-btn" id="copyOutputBtn"><i class="fas fa-copy"></i> Copy</button>
+                            <button class="panel-btn" id="downloadBtn"><i class="fas fa-download"></i> Download</button>
+                        </div>
+                    </div>
+                    <textarea class="text-area" id="outputText" placeholder="Processed text appears here..." readonly></textarea>
+                </div>
+            </div>
+        </main>
+
+        <!-- Right Panel -->
+        <aside class="right-panel">
+            <!-- Stats -->
+            <div class="panel-card">
+                <div class="panel-card-header">
+                    <h3><i class="fas fa-chart-bar"></i> Statistics</h3>
+                </div>
+                <div class="stats-tabs">
+                    <button class="stats-tab active" data-tab="input">Input</button>
+                    <button class="stats-tab" data-tab="output">Output</button>
+                    <button class="stats-tab" data-tab="diff">Diff</button>
+                </div>
+                <div class="stats-grid" id="statsContent">
+                    <div class="stat-item">
+                        <div class="stat-value" id="statChars">0</div>
+                        <div class="stat-label">Chars</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="statWords">0</div>
+                        <div class="stat-label">Words</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="statLines">0</div>
+                        <div class="stat-label">Lines</div>
+                    </div>
+                </div>
+                <div class="diff-stats" id="diffStats" style="display: none;">
+                    <div class="diff-stat" id="diffChars">
+                        <div class="diff-value">0</div>
+                        <div class="diff-label">Chars</div>
+                    </div>
+                    <div class="diff-stat" id="diffWords">
+                        <div class="diff-value">0</div>
+                        <div class="diff-label">Words</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- History -->
+            <div class="panel-card">
+                <div class="panel-card-header">
+                    <h3><i class="fas fa-history"></i> History</h3>
+                    <button class="panel-btn" id="clearHistoryBtn"><i class="fas fa-trash"></i></button>
+                </div>
+                <div class="history-list" id="historyList">
+                    <div class="history-empty">No history yet</div>
+                </div>
+            </div>
+        </aside>
     </div>
-  </div>
 
-<script>
-(() => {
-  const $ = sel => document.querySelector(sel);
-  const $$ = sel => [...document.querySelectorAll(sel)];
+    <!-- Toasts -->
+    <div class="toast-container" id="toasts"></div>
 
-  // Elements
-  const els = {
-    input: $('#input'),
-    output: $('#output'),
-    applyBtn: $('#applyBtn'),
-    liveMode: $('#liveMode'),
-    pasteBtn: $('#pasteBtn'),
-    clearBtn: $('#clearBtn'),
-    copyBtn: $('#copyBtn'),
-    swapBtn: $('#swapBtn'),
-    downloadBtn: $('#downloadBtn'),
-    shareBtn: $('#shareBtn'),
-    fileInput: $('#fileInput'),
-    resetOptions: $('#resetOptions'),
-    themeToggle: $('#themeToggle'),
-    inStats: $('#inStats'),
-    outStats: $('#outStats'),
-    findInput: $('#findText'),
-    replaceInput: $('#replaceText'),
-    findReplaceBtn: $('#findReplaceBtn'),
-    autoSelectOutput: $('#autoSelectOutput'),
-    autoScroll: $('#autoScroll'),
-    // options
-    opts: {
-      trim: $('#trim'),
-      trimLines: $('#trimLines'),
-      collapseSpaces: $('#collapseSpaces'),
-      normalizeEOL: $('#normalizeEOL'),
-      removeEmptyLines: $('#removeEmptyLines'),
-      collapseBlankLines: $('#collapseBlankLines'),
-      replaceTabs: $('#replaceTabs'),
-      tabSize: $('#tabSize'),
-      removePunct: $('#removePunct'),
-      removeDigits: $('#removeDigits'),
-      removeEmojis: $('#removeEmojis'),
-      removeDiacritics: $('#removeDiacritics'),
-      asciiOnly: $('#asciiOnly'),
-      stripHtml: $('#stripHtml'),
-      decodeHtml: $('#decodeHtml'),
-      encodeHtml: $('#encodeHtml'),
-      caseRadios: $$('input[name="case"]'),
-      removeBullets: $('#removeBullets'),
-      uniqueLines: $('#uniqueLines'),
-      uniqueIgnoreCase: $('#uniqueIgnoreCase'),
-      sortLines: $('#sortLines'),
-      removeStopwords: $('#removeStopwords'),
-      customStopwords: $('#customStopwords'),
-      slugify: $('#slugify'),
-      snake: $('#snake'),
-      camel: $('#camel'),
-      kebab: $('#kebab'),
-      regexMode: $('#regexMode'),
-      caseInsensitive: $('#caseInsensitive'),
-      multiline: $('#multiline'),
-    }
-  };
+    <!-- Modals -->
+    <div class="modal-overlay" id="prefixModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="prefixModalTitle">Add Prefix</h3>
+                <button class="modal-close" onclick="closeModal('prefixModal')"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label" id="prefixModalLabel">Prefix:</label>
+                    <input type="text" class="form-input" id="prefixInput" placeholder="Enter text...">
+                </div>
+                <div class="form-group">
+                    <label class="form-check">
+                        <input type="checkbox" id="prefixEachLine" checked>
+                        Apply to each line
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('prefixModal')">Cancel</button>
+                <button class="btn btn-primary" id="prefixApplyBtn">Add to Pipeline</button>
+            </div>
+        </div>
+    </div>
 
-  // Utilities
-  const supportsProp = prop => {
-    try { new RegExp('\\p{' + prop + '}', 'u'); return true; } catch { return false; }
-  };
-  const RE = {
-    punct: supportsProp('P') ? /\p{P}+/gu : /[.,/#!$%^&*;:{}=\-_`~()"'[```\\<>?|+]+/g,
-    letter: supportsProp('L') ? /\p{L}/u : /[A-Za-z]/,
-    word: supportsProp('L') ? /\p{L}[\p{L}\p{M}\p{N}'’_-]*/gu : /[A-Za-z0-9_'’_-]+/g,
-    emoji: supportsProp('Extended_Pictographic') ? /\p{Extended_Pictographic}|\uFE0F/gu : /[\u231A-\u27BF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|\uD83E[\uDD00-\uDDFF]/g,
-    digits: /\d+/g,
-    tabs: /\t/g,
-    eol: /\r\n?/g,
-    blankLines: /\n{2,}/g,
-    emptyLine: /^\s*$(?:\r?\n)?/gm,
-    bullets: /^\s*(?:[-–—*•·]+|\d{1,4}[.)])\s+/gm,
-    nonAscii: /[^\x00-\x7F]+/g,
-    sentenceBoundary: /(^\s*[a-zA-Z]|[.!?]\s+[a-zA-Z])/g, // rough
-  };
+    <div class="modal-overlay" id="wrapModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Wrap Lines</h3>
+                <button class="modal-close" onclick="closeModal('wrapModal')"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Before:</label>
+                    <input type="text" class="form-input" id="wrapBefore" placeholder='e.g., <li>'>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">After:</label>
+                    <input type="text" class="form-input" id="wrapAfter" placeholder='e.g., </li>'>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('wrapModal')">Cancel</button>
+                <button class="btn btn-primary" id="wrapApplyBtn">Add to Pipeline</button>
+            </div>
+        </div>
+    </div>
 
-  // Stopwords (English - compact set)
-  const STOPWORDS = new Set([
-    'a','about','above','after','again','against','all','am','an','and','any','are','aren\'t','as','at',
-    'be','because','been','before','being','below','between','both','but','by',
-    'can','can\'t','cannot','could','couldn\'t',
-    'did','didn\'t','do','does','doesn\'t','doing','don\'t','down','during',
-    'each','few','for','from','further',
-    'had','hadn\'t','has','hasn\'t','have','haven\'t','having','he','he\'d','he\'ll','he\'s','her','here','here\'s','hers','herself','him','himself','his','how','how\'s',
-    'i','i\'d','i\'ll','i\'m','i\'ve','if','in','into','is','isn\'t','it','it\'s','its','itself',
-    'let\'s','me','more','most','mustn\'t','my','myself',
-    'no','nor','not','of','off','on','once','only','or','other','ought','our','ours','ourselves','out','over','own',
-    'same','she','she\'d','she\'ll','she\'s','should','shouldn\'t','so','some','such',
-    'than','that','that\'s','the','their','theirs','them','themselves','then','there','there\'s','these','they','they\'d','they\'ll','they\'re','they\'ve','this','those','through','to','too',
-    'under','until','up','very',
-    'was','wasn\'t','we','we\'d','we\'ll','we\'re','we\'ve','were','weren\'t','what','what\'s','when','when\'s','where','where\'s','which','while','who','who\'s','whom','why','why\'s','with','won\'t','would','wouldn\'t',
-    'you','you\'d','you\'ll','you\'re','you\'ve','your','yours','yourself','yourselves'
-  ]);
+    <div class="modal-overlay" id="presetsModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3><i class="fas fa-wand-sparkles"></i> Presets</h3>
+                <button class="modal-close" onclick="closeModal('presetsModal')"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="preset-grid">
+                    <div class="preset-item" data-preset="basic">
+                        <h4><i class="fas fa-broom"></i> Basic Clean</h4>
+                        <p>Trim + extra spaces + empty lines</p>
+                    </div>
+                    <div class="preset-item" data-preset="deep">
+                        <h4><i class="fas fa-sparkles"></i> Deep Clean</h4>
+                        <p>All whitespace + duplicates</p>
+                    </div>
+                    <div class="preset-item" data-preset="list">
+                        <h4><i class="fas fa-list"></i> List Clean</h4>
+                        <p>Dedupe + sort + trim</p>
+                    </div>
+                    <div class="preset-item" data-preset="code">
+                        <h4><i class="fas fa-code"></i> Code Clean</h4>
+                        <p>Trailing spaces + tabs + empty</p>
+                    </div>
+                    <div class="preset-item" data-preset="text">
+                        <h4><i class="fas fa-font"></i> Plain Text</h4>
+                        <p>Remove all special + HTML</p>
+                    </div>
+                    <div class="preset-item" data-preset="web">
+                        <h4><i class="fas fa-globe"></i> Web Scrape</h4>
+                        <p>HTML + URLs + normalize</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-  const debounce = (fn, ms=150) => {
-    let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
-  };
+    <input type="file" id="fileInput" accept=".txt,.json,.csv,.html,.xml,.md,.js,.css">
 
-  // Stats
-  function getStats(text) {
-    const chars = text.length;
-    const words = (text.match(RE.word) || []).length;
-    const lines = text === '' ? 0 : text.split(/\r\n|\r|\n/).length;
-    return { chars, words, lines };
-  }
-  function renderStats(el, stats) {
-    const pills = el.querySelectorAll('.pill');
-    pills[0].textContent = `${stats.chars} chars`;
-    pills[1].textContent = `${stats.words} words`;
-    pills[2].textContent = `${stats.lines} lines`;
-  }
+    <script>
+        // ===================== STATE =====================
+        const state = {
+            pipeline: [],       // Array of operation objects {action, name, params}
+            history: [],
+            historyIndex: -1,
+            autoApply: true,
+            activeStatsTab: 'input',
+            debounceTimer: null
+        };
 
-  // HTML entities
-  function decodeHTMLEntities(text) {
-    const div = document.createElement('textarea');
-    div.innerHTML = text;
-    return div.value;
-  }
-  function encodeHTMLEntities(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
-  function stripHTML(text) {
-    const div = document.createElement('div');
-    div.innerHTML = text;
-    return div.textContent || '';
-  }
+        // ===================== DOM =====================
+        const $ = id => document.getElementById(id);
+        const $$ = sel => document.querySelectorAll(sel);
 
-  // Case transforms
-  function toTitleCase(text) {
-    return text.toLowerCase().replace(/\b([\p{L}\p{M}\p{N}])/gu, (m, g1) => g1.toUpperCase());
-  }
-  function toSentenceCase(text) {
-    let out = text.toLowerCase();
-    // Capitalize after start or sentence end punctuation + space(s)
-    out = out.replace(/(^\s*\p{L})|([.!?]\s+)(\p{L})/gu, (m, a, b, c) => (a ? a.toUpperCase() : b + c.toUpperCase()));
-    return out;
-  }
+        const dom = {
+            input: $('inputText'),
+            output: $('outputText'),
+            pipelineItems: $('pipelineItems'),
+            pipelineCount: $('pipelineCount'),
+            autoApply: $('autoApply'),
+            autoApplyToggle: $('autoApplyToggle'),
+            processing: $('processingIndicator'),
+            historyList: $('historyList'),
+            toasts: $('toasts'),
+            undoBtn: $('undoBtn'),
+            redoBtn: $('redoBtn')
+        };
 
-  // Transform helpers
-  const removeDiacritics = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  const toSlug = (s) => {
-    s = removeDiacritics(s).toLowerCase();
-    s = s.replace(/[^a-z0-9]+/g, '-').replace(/-{2,}/g, '-').replace(/^-+|-+$/g, '');
-    return s;
-  };
-  const toSnake = (s) => {
-    s = removeDiacritics(s);
-    s = s.replace(/([a-z0-9])([A-Z])/g, '$1_$2');
-    s = s.replace(/[^A-Za-z0-9]+/g, '_').replace(/_{2,}/g, '_').replace(/^_+|_+$/g, '');
-    return s.toLowerCase();
-  };
-  const toKebab = (s) => toSnake(s).replace(/_/g, '-');
-  const toCamel = (s) => {
-    s = toSnake(s).split('_').filter(Boolean);
-    if (!s.length) return '';
-    return s[0] + s.slice(1).map(w => w[0] ? w[0].toUpperCase()+w.slice(1) : w).join('');
-  };
+        // ===================== PROCESSORS =====================
+        const ops = {
+            // Whitespace
+            trimWhitespace: t => t.split('\n').map(l => l.trim()).join('\n'),
+            removeExtraSpaces: t => t.replace(/ {2,}/g, ' '),
+            removeAllSpaces: t => t.replace(/ /g, ''),
+            removeLeading: t => t.split('\n').map(l => l.trimStart()).join('\n'),
+            removeTrailing: t => t.split('\n').map(l => l.trimEnd()).join('\n'),
+            normalizeSpace: t => t.replace(/\s+/g, ' ').trim(),
+            tabsToSpaces: t => t.replace(/\t/g, '    '),
+            spacesToTabs: t => t.replace(/    /g, '\t'),
 
-  // Find/replace
-  function applyFindReplace(text, find, replace, flags) {
-    if (!find) return text;
-    try {
-      const re = new RegExp(find, flags);
-      return text.replace(re, replace);
-    } catch (e) {
-      console.warn('Invalid regex:', e);
-      return text;
-    }
-  }
+            // Lines
+            removeEmptyLines: t => t.split('\n').filter(l => l.trim()).join('\n'),
+            removeDuplicates: t => [...new Set(t.split('\n'))].join('\n'),
+            removeLineBreaks: t => t.replace(/\n+/g, ' '),
+            mergeLines: t => t.replace(/\n/g, ' ').replace(/ +/g, ' ').trim(),
+            sortAZ: t => t.split('\n').sort((a, b) => a.localeCompare(b, undefined, {sensitivity: 'base'})).join('\n'),
+            sortZA: t => t.split('\n').sort((a, b) => b.localeCompare(a, undefined, {sensitivity: 'base'})).join('\n'),
+            sortLength: t => t.split('\n').sort((a, b) => a.length - b.length).join('\n'),
+            sortLengthDesc: t => t.split('\n').sort((a, b) => b.length - a.length).join('\n'),
+            reverse: t => t.split('\n').reverse().join('\n'),
+            shuffle: t => { const l = t.split('\n'); for(let i = l.length-1; i > 0; i--) { const j = Math.floor(Math.random()*(i+1)); [l[i],l[j]] = [l[j],l[i]]; } return l.join('\n'); },
+            addNumbers: t => t.split('\n').map((l, i) => `${i+1}. ${l}`).join('\n'),
+            removeNumbers: t => t.split('\n').map(l => l.replace(/^\d+[\.\)\-:\s]+/, '')).join('\n'),
 
-  // Cleaning pipeline
-  function getOptions() {
-    const caseVal = els.opts.caseRadios.find(r => r.checked)?.value || 'none';
-    return {
-      trim: els.opts.trim.checked,
-      trimLines: els.opts.trimLines.checked,
-      collapseSpaces: els.opts.collapseSpaces.checked,
-      normalizeEOL: els.opts.normalizeEOL.checked,
-      removeEmptyLines: els.opts.removeEmptyLines.checked,
-      collapseBlankLines: els.opts.collapseBlankLines.checked,
-      replaceTabs: els.opts.replaceTabs.checked,
-      tabSize: Math.min(8, Math.max(1, parseInt(els.opts.tabSize.value || '2', 10))),
-      removePunct: els.opts.removePunct.checked,
-      removeDigits: els.opts.removeDigits.checked,
-      removeEmojis: els.opts.removeEmojis.checked,
-      removeDiacritics: els.opts.removeDiacritics.checked,
-      asciiOnly: els.opts.asciiOnly.checked,
-      stripHtml: els.opts.stripHtml.checked,
-      decodeHtml: els.opts.decodeHtml.checked,
-      encodeHtml: els.opts.encodeHtml.checked,
-      caseMode: caseVal,
-      removeBullets: els.opts.removeBullets.checked,
-      uniqueLines: els.opts.uniqueLines.checked,
-      uniqueIgnoreCase: els.opts.uniqueIgnoreCase.checked,
-      sortLines: els.opts.sortLines.value,
-      removeStopwords: els.opts.removeStopwords.checked,
-      customStopwords: (els.opts.customStopwords.value || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean),
-      slugify: els.opts.slugify.checked,
-      snake: els.opts.snake.checked,
-      camel: els.opts.camel.checked,
-      kebab: els.opts.kebab.checked,
-      // find/replace
-      find: els.findInput.value,
-      replace: els.replaceInput.value,
-      regex: els.opts.regexMode.checked,
-      ci: els.opts.caseInsensitive.checked,
-      ml: els.opts.multiline.checked,
-    };
-  }
+            // Case
+            uppercase: t => t.toUpperCase(),
+            lowercase: t => t.toLowerCase(),
+            titleCase: t => t.replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.substr(1).toLowerCase()),
+            sentenceCase: t => t.toLowerCase().replace(/(^\s*\w|[.!?]\s+\w)/g, c => c.toUpperCase()),
+            camelCase: t => t.toLowerCase().replace(/[^a-zA-Z0-9]+(.)/g, (_, c) => c.toUpperCase()),
+            pascalCase: t => { const c = ops.camelCase(t); return c.charAt(0).toUpperCase() + c.slice(1); },
+            snakeCase: t => t.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, ''),
+            kebabCase: t => t.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
+            toggleCase: t => t.split('').map(c => c === c.toUpperCase() ? c.toLowerCase() : c.toUpperCase()).join(''),
+            alternating: t => t.split('').map((c, i) => i % 2 ? c.toUpperCase() : c.toLowerCase()).join(''),
 
-  function cleanText(input, o) {
-    let t = input;
+            // Remove
+            removeDigits: t => t.replace(/\d/g, ''),
+            removeLetters: t => t.replace(/[a-zA-Z]/g, ''),
+            removePunctuation: t => t.replace(/[^\w\s]|_/g, ''),
+            removeSpecial: t => t.replace(/[^a-zA-Z0-9\s]/g, ''),
+            removeHTML: t => t.replace(/<[^>]*>/g, ''),
+            removeURLs: t => t.replace(/https?:\/\/[^\s]+/g, ''),
+            removeEmails: t => t.replace(/[\w.-]+@[\w.-]+\.\w+/g, ''),
+            removeEmojis: t => t.replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]/gu, ''),
 
-    // EOL normalization first for consistent line ops
-    if (o.normalizeEOL) t = t.replace(RE.eol, '\n');
+            // Add/Wrap
+            addQuotes: t => t.split('\n').map(l => `'${l}'`).join('\n'),
+            addDoubleQuotes: t => t.split('\n').map(l => `"${l}"`).join('\n'),
+            addBrackets: t => t.split('\n').map(l => `[${l}]`).join('\n'),
+            addParens: t => t.split('\n').map(l => `(${l})`).join('\n'),
 
-    // Tabs
-    if (o.replaceTabs) t = t.replace(RE.tabs, ' '.repeat(o.tabSize));
+            // Extract
+            extractEmails: t => (t.match(/[\w.-]+@[\w.-]+\.\w+/g) || []).join('\n'),
+            extractURLs: t => (t.match(/https?:\/\/[^\s]+/g) || []).join('\n'),
+            extractNumbers: t => (t.match(/-?\d+\.?\d*/g) || []).join('\n'),
+            extractWords: t => (t.match(/\b[a-zA-Z]+\b/g) || []).join('\n'),
+            extractHashtags: t => (t.match(/#\w+/g) || []).join('\n'),
+            extractMentions: t => (t.match(/@\w+/g) || []).join('\n'),
 
-    // HTML handling
-    if (o.decodeHtml) t = decodeHTMLEntities(t);
-    if (o.stripHtml) t = stripHTML(t);
+            // Encode/Decode
+            base64Encode: t => { try { return btoa(unescape(encodeURIComponent(t))); } catch { return 'Error'; } },
+            base64Decode: t => { try { return decodeURIComponent(escape(atob(t.trim()))); } catch { return 'Error'; } },
+            urlEncode: t => encodeURIComponent(t),
+            urlDecode: t => { try { return decodeURIComponent(t); } catch { return 'Error'; } },
+            htmlEncode: t => t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'),
+            htmlDecode: t => { const el = document.createElement('textarea'); el.innerHTML = t; return el.value; },
 
-    // Trim ends
-    if (o.trim) t = t.trim();
+            // Format
+            formatJSON: t => { try { return JSON.stringify(JSON.parse(t), null, 2); } catch { return 'Invalid JSON'; } },
+            minifyJSON: t => { try { return JSON.stringify(JSON.parse(t)); } catch { return 'Invalid JSON'; } },
+            formatXML: t => { let f = '', i = ''; t.replace(/>\s*</g,'><').split(/(<[^>]+>)/g).forEach(n => { if(n.match(/^<\/\w/)) i = i.slice(2); if(n.match(/^<\w[^>]*[^\/]>$/)) { f += i + n + '\n'; i += '  '; } else if(n.match(/^<\/\w/)) { f += i + n + '\n'; } else if(n.match(/^<\w[^>]*\/>$/)) { f += i + n + '\n'; } else if(n.trim()) { f += i + n + '\n'; } }); return f.trim(); },
+            formatCSS: t => t.replace(/\{/g,' {\n  ').replace(/;/g,';\n  ').replace(/\}/g,'\n}\n').replace(/  \}/g,'}'),
 
-    // Per-line pre-processing
-    let lines = t.split('\n');
+            // Custom with params
+            addPrefix: (t, p) => p.eachLine ? t.split('\n').map(l => p.text + l).join('\n') : p.text + t,
+            addSuffix: (t, p) => p.eachLine ? t.split('\n').map(l => l + p.text).join('\n') : t + p.text,
+            wrapLines: (t, p) => t.split('\n').map(l => p.before + l + p.after).join('\n'),
+            findReplace: (t, p) => {
+                let pattern = p.regex ? p.find : p.find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                if (p.word && !p.regex) pattern = `\\b${pattern}\\b`;
+                return t.replace(new RegExp(pattern, p.case ? 'g' : 'gi'), p.replace);
+            }
+        };
 
-    if (o.removeBullets) {
-      lines = lines.map(l => l.replace(RE.bullets, ''));
-    }
-    if (o.trimLines) {
-      lines = lines.map(l => l.trim());
-    }
-    // Remove empty lines entirely
-    if (o.removeEmptyLines) {
-      lines = lines.filter(l => l.trim().length > 0);
-    }
-    t = lines.join('\n');
+        const opNames = {
+            trimWhitespace: 'Trim',
+            removeExtraSpaces: 'Extra Spaces',
+            removeAllSpaces: 'All Spaces',
+            removeLeading: 'Leading Spaces',
+            removeTrailing: 'Trailing Spaces',
+            normalizeSpace: 'Normalize',
+            tabsToSpaces: 'Tabs→Spaces',
+            spacesToTabs: 'Spaces→Tabs',
+            removeEmptyLines: 'Empty Lines',
+            removeDuplicates: 'Duplicates',
+            removeLineBreaks: 'Line Breaks',
+            mergeLines: 'Merge Lines',
+            sortAZ: 'Sort A-Z',
+            sortZA: 'Sort Z-A',
+            sortLength: 'By Length',
+            sortLengthDesc: 'Length Desc',
+            reverse: 'Reverse',
+            shuffle: 'Shuffle',
+            addNumbers: 'Add #s',
+            removeNumbers: 'Remove #s',
+            uppercase: 'UPPER',
+            lowercase: 'lower',
+            titleCase: 'Title',
+            sentenceCase: 'Sentence',
+            camelCase: 'camel',
+            pascalCase: 'Pascal',
+            snakeCase: 'snake',
+            kebabCase: 'kebab',
+            toggleCase: 'Toggle',
+            alternating: 'AlTeRn',
+            removeDigits: 'Numbers',
+            removeLetters: 'Letters',
+            removePunctuation: 'Punctuation',
+            removeSpecial: 'Special',
+            removeHTML: 'HTML',
+            removeURLs: 'URLs',
+            removeEmails: 'Emails',
+            removeEmojis: 'Emojis',
+            addQuotes: "'Quotes'",
+            addDoubleQuotes: '"Quotes"',
+            addBrackets: '[Brackets]',
+            addParens: '(Parens)',
+            extractEmails: 'Emails',
+            extractURLs: 'URLs',
+            extractNumbers: 'Numbers',
+            extractWords: 'Words',
+            extractHashtags: '#Tags',
+            extractMentions: '@Mentions',
+            base64Encode: 'B64 Enc',
+            base64Decode: 'B64 Dec',
+            urlEncode: 'URL Enc',
+            urlDecode: 'URL Dec',
+            htmlEncode: 'HTML Enc',
+            htmlDecode: 'HTML Dec',
+            formatJSON: 'JSON Pretty',
+            minifyJSON: 'JSON Min',
+            formatXML: 'XML Format',
+            formatCSS: 'CSS Format',
+            addPrefix: 'Prefix',
+            addSuffix: 'Suffix',
+            wrapLines: 'Wrap',
+            findReplace: 'Replace'
+        };
 
-    // Characters ops
-    if (o.removePunct) t = t.replace(RE.punct, '');
-    if (o.removeDigits) t = t.replace(RE.digits, '');
-    if (o.removeEmojis) t = t.replace(RE.emoji, '');
-    if (o.removeDiacritics) t = removeDiacritics(t);
-    if (o.asciiOnly) t = t.replace(RE.nonAscii, '');
+        // ===================== CORE FUNCTIONS =====================
 
-    // Collapse spaces (after char-level removals)
-    if (o.collapseSpaces) t = t.replace(/[ \t]+/g, ' ').replace(/ *\n */g, '\n');
+        function addToPipeline(action, params = null) {
+            const name = opNames[action] || action;
+            state.pipeline.push({ action, name, params });
+            renderPipeline();
+            
+            if (state.autoApply) {
+                processText();
+            }
+            
+            // Highlight button
+            const btn = document.querySelector(`[data-action="${action}"]`);
+            if (btn) {
+                btn.classList.add('active');
+                setTimeout(() => btn.classList.remove('active'), 300);
+            }
+        }
 
-    // Blank lines collapse (after space cleanup)
-    if (o.collapseBlankLines) t = t.replace(RE.blankLines, '\n');
+        function removeFromPipeline(index) {
+            state.pipeline.splice(index, 1);
+            renderPipeline();
+            if (state.autoApply) processText();
+        }
 
-    // Case transforms
-    if (o.caseMode === 'lower') t = t.toLowerCase();
-    else if (o.caseMode === 'upper') t = t.toUpperCase();
-    else if (o.caseMode === 'title') t = toTitleCase(t);
-    else if (o.caseMode === 'sentence') t = toSentenceCase(t);
+        function clearPipeline() {
+            state.pipeline = [];
+            renderPipeline();
+            dom.output.value = '';
+            updateStats();
+        }
 
-    // Stopwords removal
-    if (o.removeStopwords || o.customStopwords.length) {
-      const custom = new Set(o.customStopwords);
-      const shouldRemove = (w) => {
-        const lw = w.toLowerCase();
-        return (o.removeStopwords && STOPWORDS.has(lw)) || (custom.size && custom.has(lw));
-      };
-      // Tokenize by words and non-words to preserve spacing
-      const tokens = t.match(/\p{L}[\p{L}\p{M}\p{N}'’_-]*|[^ \t\r\n\p{L}\p{M}\p{N}'’_-]+|[ \t\r\n]+/gu) || [t];
-      t = tokens.filter(tok => {
-        if (/\p{L}/u.test(tok)) return !shouldRemove(tok);
-        return true;
-      }).join('');
-      // Clean extra spaces created
-      t = t.replace(/[ \t]+/g, ' ').replace(/ *\n */g, '\n').replace(RE.blankLines, '\n').trim();
-    }
+        function renderPipeline() {
+            dom.pipelineCount.textContent = state.pipeline.length;
+            
+            if (state.pipeline.length === 0) {
+                dom.pipelineItems.innerHTML = '<span class="pipeline-empty">Click operations to add them to the pipeline</span>';
+                return;
+            }
 
-    // Line-level post ops
-    lines = t.split('\n');
-    if (o.uniqueLines) {
-      const seen = new Set();
-      const out = [];
-      for (const line of lines) {
-        const key = o.uniqueIgnoreCase ? line.toLowerCase() : line;
-        if (!seen.has(key)) { seen.add(key); out.push(line); }
-      }
-      lines = out;
-    }
-    if (o.sortLines !== 'none') {
-      const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
-      lines = lines.slice().sort((a, b) => collator.compare(a, b));
-      if (o.sortLines === 'desc') lines.reverse();
-    }
-    t = lines.join('\n');
+            dom.pipelineItems.innerHTML = state.pipeline.map((op, i) => `
+                <div class="pipeline-item" draggable="true" data-index="${i}">
+                    <span class="op-number">${i + 1}</span>
+                    <span>${op.name}</span>
+                    <i class="fas fa-times remove-op" data-index="${i}"></i>
+                </div>
+            `).join('');
 
-    // Find & replace
-    if (o.find) {
-      let flags = 'g';
-      if (o.ci) flags += 'i';
-      if (o.ml) flags += 'm';
-      t = o.regex ? applyFindReplace(t, o.find, o.replace, flags) : t.split(o.find).join(o.replace);
-    }
+            // Remove handlers
+            dom.pipelineItems.querySelectorAll('.remove-op').forEach(btn => {
+                btn.onclick = e => {
+                    e.stopPropagation();
+                    removeFromPipeline(parseInt(btn.dataset.index));
+                };
+            });
 
-    // Transforms (mutually exclusive priority: slugify > snake > camel > kebab)
-    if (o.slugify) t = toSlug(t);
-    else if (o.snake) t = toSnake(t);
-    else if (o.camel) t = toCamel(t);
-    else if (o.kebab) t = toKebab(t);
+            // Drag handlers
+            const items = dom.pipelineItems.querySelectorAll('.pipeline-item');
+            items.forEach(item => {
+                item.ondragstart = e => {
+                    e.dataTransfer.setData('text/plain', item.dataset.index);
+                    item.classList.add('dragging');
+                };
+                item.ondragend = () => item.classList.remove('dragging');
+                item.ondragover = e => e.preventDefault();
+                item.ondrop = e => {
+                    e.preventDefault();
+                    const from = parseInt(e.dataTransfer.getData('text/plain'));
+                    const to = parseInt(item.dataset.index);
+                    if (from !== to) {
+                        const [moved] = state.pipeline.splice(from, 1);
+                        state.pipeline.splice(to, 0, moved);
+                        renderPipeline();
+                        if (state.autoApply) processText();
+                    }
+                };
+            });
+        }
 
-    // Encode HTML (last)
-    if (o.encodeHtml) t = encodeHTMLEntities(t);
+        function processText() {
+            const input = dom.input.value;
+            if (!input || state.pipeline.length === 0) {
+                dom.output.value = input;
+                updateStats();
+                return;
+            }
 
-    return t;
-  }
+            // Show processing
+            dom.processing.classList.add('active');
 
-  // Render
-  const apply = () => {
-    const text = els.input.value;
-    renderStats(els.inStats, getStats(text));
-    const opts = getOptions();
-    const cleaned = cleanText(text, opts);
-    els.output.value = cleaned;
-    renderStats(els.outStats, getStats(cleaned));
-    if (els.autoScroll.checked) {
-      $('#outputPane').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-    saveState();
-  };
+            // Use setTimeout for UI update
+            setTimeout(() => {
+                let result = input;
+                
+                for (const op of state.pipeline) {
+                    if (ops[op.action]) {
+                        result = op.params ? ops[op.action](result, op.params) : ops[op.action](result);
+                    }
+                }
 
-  const liveApply = debounce(() => els.liveMode.checked ? apply() : null, 120);
+                dom.output.value = result;
+                updateStats();
+                dom.processing.classList.remove('active');
+            }, 10);
+        }
 
-  // Clipboard & IO
-  async function copyOutput() {
-    const val = els.output.value;
-    if (!val) return;
-    try {
-      await navigator.clipboard.writeText(val);
-      if (els.autoSelectOutput.checked) {
-        els.output.focus(); els.output.select();
-      }
-      flash(els.copyBtn, 'Copied!');
-    } catch {
-      // Fallback
-      els.output.focus(); els.output.select();
-      document.execCommand('copy');
-      flash(els.copyBtn, 'Copied!');
-    }
-  }
-  async function pasteToInput() {
-    try {
-      const text = await navigator.clipboard.readText();
-      els.input.value = text;
-      liveApply();
-    } catch {
-      alert('Clipboard permission denied. Paste with Ctrl/Cmd+V.');
-    }
-  }
-  function downloadOutput() {
-    const blob = new Blob([els.output.value], { type: 'text/plain;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'cleaned.txt';
-    a.click();
-    URL.revokeObjectURL(a.href);
-  }
-  function flash(btn, text) {
-    const prev = btn.textContent;
-    btn.textContent = text;
-    setTimeout(() => btn.textContent = prev, 900);
-  }
+        // ===================== HISTORY =====================
 
-  // State persistence
-  const STORAGE_KEY = 'textCleaner:state:v1';
-  function saveState() {
-    const state = {
-      input: els.input.value.slice(0, 200000), // cap to avoid huge storage
-      options: getOptions(),
-      autoSelectOutput: els.autoSelectOutput.checked,
-      autoScroll: els.autoScroll.checked,
-      liveMode: els.liveMode.checked,
-    };
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
-  }
-  function loadState() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const s = JSON.parse(raw);
-      if (typeof s.input === 'string') els.input.value = s.input;
-      const o = s.options || {};
-      // set options
-      els.opts.trim.checked = !!o.trim;
-      els.opts.trimLines.checked = !!o.trimLines;
-      els.opts.collapseSpaces.checked = !!o.collapseSpaces;
-      els.opts.normalizeEOL.checked = !!o.normalizeEOL;
-      els.opts.removeEmptyLines.checked = !!o.removeEmptyLines;
-      els.opts.collapseBlankLines.checked = !!o.collapseBlankLines;
-      els.opts.replaceTabs.checked = !!o.replaceTabs;
-      els.opts.tabSize.value = o.tabSize || 2;
-      els.opts.removePunct.checked = !!o.removePunct;
-      els.opts.removeDigits.checked = !!o.removeDigits;
-      els.opts.removeEmojis.checked = !!o.removeEmojis;
-      els.opts.removeDiacritics.checked = !!o.removeDiacritics;
-      els.opts.asciiOnly.checked = !!o.asciiOnly;
-      els.opts.stripHtml.checked = !!o.stripHtml;
-      els.opts.decodeHtml.checked = !!o.decodeHtml;
-      els.opts.encodeHtml.checked = !!o.encodeHtml;
-      els.opts.caseRadios.forEach(r => r.checked = r.value === (o.caseMode || 'none'));
-      els.opts.removeBullets.checked = !!o.removeBullets;
-      els.opts.uniqueLines.checked = !!o.uniqueLines;
-      els.opts.uniqueIgnoreCase.checked = !!o.uniqueIgnoreCase;
-      els.opts.sortLines.value = o.sortLines || 'none';
-      els.opts.removeStopwords.checked = !!o.removeStopwords;
-      els.opts.customStopwords.value = (o.customStopwords || []).join(', ');
-      els.opts.slugify.checked = !!o.slugify;
-      els.opts.snake.checked = !!o.snake;
-      els.opts.camel.checked = !!o.camel;
-      els.opts.kebab.checked = !!o.kebab;
-      els.findInput.value = o.find || '';
-      els.replaceInput.value = o.replace || '';
-      els.opts.regexMode.checked = !!o.regex;
-      els.opts.caseInsensitive.checked = !!o.ci;
-      els.opts.multiline.checked = !!o.ml;
-      els.autoSelectOutput.checked = !!s.autoSelectOutput;
-      els.autoScroll.checked = !!s.autoScroll;
-      els.liveMode.checked = !!s.liveMode;
-    } catch {}
-  }
+        function saveHistory(actionName) {
+            state.history = state.history.slice(0, state.historyIndex + 1);
+            state.history.push({
+                pipeline: JSON.parse(JSON.stringify(state.pipeline)),
+                input: dom.input.value,
+                output: dom.output.value,
+                action: actionName,
+                time: new Date()
+            });
+            state.historyIndex = state.history.length - 1;
+            updateHistoryUI();
+            updateUndoRedo();
+        }
 
-  // Theme toggle
-  function toggleTheme() {
-    const now = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
-    document.documentElement.dataset.theme = now;
-    document.documentElement.style.colorScheme = now;
-  }
+        function undo() {
+            if (state.historyIndex > 0) {
+                state.historyIndex--;
+                restoreHistory(state.historyIndex);
+            } else if (state.historyIndex === 0) {
+                state.pipeline = [];
+                dom.output.value = '';
+                state.historyIndex = -1;
+                renderPipeline();
+                updateStats();
+            }
+            updateUndoRedo();
+            updateHistoryUI();
+        }
 
-  // Events
-  els.applyBtn.addEventListener('click', apply);
-  els.input.addEventListener('input', liveApply);
-  $$('.options input, .options select').forEach(el => el.addEventListener('input', liveApply));
-  els.pasteBtn.addEventListener('click', pasteToInput);
-  els.clearBtn.addEventListener('click', () => { els.input.value = ''; liveApply(); });
-  els.copyBtn.addEventListener('click', copyOutput);
-  els.swapBtn.addEventListener('click', () => { els.input.value = els.output.value; liveApply(); });
-  els.downloadBtn.addEventListener('click', downloadOutput);
-  els.shareBtn.addEventListener('click', async () => {
-    const text = els.output.value;
-    if (!text) return;
-    if (navigator.share) {
-      try { await navigator.share({ text }); } catch {}
-    } else {
-      await navigator.clipboard.writeText(text);
-      flash(els.shareBtn, 'Copied to clipboard');
-    }
-  });
-  els.fileInput.addEventListener('change', async e => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    const text = await f.text();
-    els.input.value = text;
-    liveApply();
-    e.target.value = '';
-  });
-  els.findReplaceBtn.addEventListener('click', () => {
-    const o = getOptions();
-    let flags = 'g';
-    if (o.ci) flags += 'i';
-    if (o.ml) flags += 'm';
-    const src = els.input.value;
-    const out = o.regex ? applyFindReplace(src, o.find, o.replace, flags) : src.split(o.find).join(o.replace);
-    els.input.value = out;
-    liveApply();
-  });
-  els.resetOptions.addEventListener('click', () => {
-    // Reset checkboxes/selects to defaults
-    const defaults = {
-      trim:false, trimLines:false, collapseSpaces:true, normalizeEOL:true, removeEmptyLines:false,
-      collapseBlankLines:true, replaceTabs:false, tabSize:2,
-      removePunct:false, removeDigits:false, removeEmojis:false, removeDiacritics:false, asciiOnly:false,
-      stripHtml:false, decodeHtml:false, encodeHtml:false,
-      caseMode:'none', removeBullets:false, uniqueLines:false, uniqueIgnoreCase:true, sortLines:'none',
-      removeStopwords:false, customStopwords:[], slugify:false, snake:false, camel:false, kebab:false,
-      find:'', replace:'', regex:false, ci:true, ml:false
-    };
-    els.opts.trim.checked = defaults.trim;
-    els.opts.trimLines.checked = defaults.trimLines;
-    els.opts.collapseSpaces.checked = defaults.collapseSpaces;
-    els.opts.normalizeEOL.checked = defaults.normalizeEOL;
-    els.opts.removeEmptyLines.checked = defaults.removeEmptyLines;
-    els.opts.collapseBlankLines.checked = defaults.collapseBlankLines;
-    els.opts.replaceTabs.checked = defaults.replaceTabs;
-    els.opts.tabSize.value = defaults.tabSize;
-    els.opts.removePunct.checked = defaults.removePunct;
-    els.opts.removeDigits.checked = defaults.removeDigits;
-    els.opts.removeEmojis.checked = defaults.removeEmojis;
-    els.opts.removeDiacritics.checked = defaults.removeDiacritics;
-    els.opts.asciiOnly.checked = defaults.asciiOnly;
-    els.opts.stripHtml.checked = defaults.stripHtml;
-    els.opts.decodeHtml.checked = defaults.decodeHtml;
-    els.opts.encodeHtml.checked = defaults.encodeHtml;
-    els.opts.caseRadios.forEach(r => r.checked = r.value === defaults.caseMode);
-    els.opts.removeBullets.checked = defaults.removeBullets;
-    els.opts.uniqueLines.checked = defaults.uniqueLines;
-    els.opts.uniqueIgnoreCase.checked = defaults.uniqueIgnoreCase;
-    els.opts.sortLines.value = defaults.sortLines;
-    els.opts.removeStopwords.checked = defaults.removeStopwords;
-    els.opts.customStopwords.value = '';
-    els.opts.slugify.checked = defaults.slugify;
-    els.opts.snake.checked = defaults.snake;
-    els.opts.camel.checked = defaults.camel;
-    els.opts.kebab.checked = defaults.kebab;
-    els.findInput.value = defaults.find;
-    els.replaceInput.value = defaults.replace;
-    els.opts.regexMode.checked = defaults.regex;
-    els.opts.caseInsensitive.checked = defaults.ci;
-    els.opts.multiline.checked = defaults.ml;
-    liveApply();
-  });
-  els.themeToggle.addEventListener('click', toggleTheme);
+        function redo() {
+            if (state.historyIndex < state.history.length - 1) {
+                state.historyIndex++;
+                restoreHistory(state.historyIndex);
+                updateUndoRedo();
+                updateHistoryUI();
+            }
+        }
 
-  // Keyboard shortcuts
-  document.addEventListener('keydown', e => {
-    const mod = e.ctrlKey || e.metaKey;
-    if (mod && e.key === 'Enter') { e.preventDefault(); apply(); }
-    if (mod && e.key.toLowerCase() === 'c') {
-      if (document.activeElement !== els.input && document.activeElement !== els.output) {
-        e.preventDefault(); copyOutput();
-      }
-    }
-  });
+        function restoreHistory(index) {
+            const h = state.history[index];
+            state.pipeline = JSON.parse(JSON.stringify(h.pipeline));
+            dom.input.value = h.input;
+            dom.output.value = h.output;
+            renderPipeline();
+            updateStats();
+        }
 
-  // Initialize
-  loadState();
-  apply();
-})();
-</script>
+        function updateUndoRedo() {
+            dom.undoBtn.disabled = state.historyIndex < 0;
+            dom.redoBtn.disabled = state.historyIndex >= state.history.length - 1;
+        }
+
+        function updateHistoryUI() {
+            if (state.history.length === 0) {
+                dom.historyList.innerHTML = '<div class="history-empty">No history yet</div>';
+                return;
+            }
+
+            dom.historyList.innerHTML = state.history.slice().reverse().map((h, i) => {
+                const idx = state.history.length - 1 - i;
+                const isActive = idx === state.historyIndex;
+                return `
+                    <div class="history-item" style="${isActive ? 'background:var(--bg-tertiary);' : ''}">
+                        <div class="history-info">
+                            <div class="history-action">${h.action}</div>
+                            <div class="history-time">${h.time.toLocaleTimeString()}</div>
+                        </div>
+                        <button class="history-restore" onclick="restoreHistory(${idx}); updateHistoryUI();">Restore</button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ===================== STATS =====================
+
+        function getStats(text) {
+            return {
+                chars: text.length,
+                words: text.trim() ? text.trim().split(/\s+/).length : 0,
+                lines: text ? text.split('\n').length : 0
+            };
+        }
+
+        function updateStats() {
+            const tab = state.activeStatsTab;
+            
+            if (tab === 'diff') {
+                $('statsContent').style.display = 'none';
+                $('diffStats').style.display = 'grid';
+                
+                const inStats = getStats(dom.input.value);
+                const outStats = getStats(dom.output.value);
+                
+                const charDiff = outStats.chars - inStats.chars;
+                const wordDiff = outStats.words - inStats.words;
+                
+                const diffChars = $('diffChars');
+                const diffWords = $('diffWords');
+                
+                diffChars.querySelector('.diff-value').textContent = (charDiff >= 0 ? '+' : '') + charDiff;
+                diffChars.className = 'diff-stat ' + (charDiff > 0 ? 'positive' : charDiff < 0 ? 'negative' : '');
+                
+                diffWords.querySelector('.diff-value').textContent = (wordDiff >= 0 ? '+' : '') + wordDiff;
+                diffWords.className = 'diff-stat ' + (wordDiff > 0 ? 'positive' : wordDiff < 0 ? 'negative' : '');
+            } else {
+                $('statsContent').style.display = 'grid';
+                $('diffStats').style.display = 'none';
+                
+                const text = tab === 'input' ? dom.input.value : dom.output.value;
+                const stats = getStats(text);
+                
+                $('statChars').textContent = stats.chars.toLocaleString();
+                $('statWords').textContent = stats.words.toLocaleString();
+                $('statLines').textContent = stats.lines.toLocaleString();
+            }
+        }
+
+        // ===================== MODALS =====================
+
+        function openModal(id) { $(id).classList.add('active'); }
+        function closeModal(id) { $(id).classList.remove('active'); }
+
+        // ===================== TOAST =====================
+
+        function toast(msg, type = 'success') {
+            const icons = { success: 'check-circle', error: 'times-circle', warning: 'exclamation-triangle', info: 'info-circle' };
+            const t = document.createElement('div');
+            t.className = `toast ${type}`;
+            t.innerHTML = `<i class="fas fa-${icons[type]}"></i><span>${msg}</span>`;
+            dom.toasts.appendChild(t);
+            setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 2500);
+        }
+
+        // ===================== PRESETS =====================
+
+        const presets = {
+            basic: ['trimWhitespace', 'removeExtraSpaces', 'removeEmptyLines'],
+            deep: ['trimWhitespace', 'removeExtraSpaces', 'removeEmptyLines', 'removeDuplicates', 'normalizeSpace'],
+            list: ['trimWhitespace', 'removeEmptyLines', 'removeDuplicates', 'sortAZ'],
+            code: ['removeTrailing', 'tabsToSpaces', 'removeEmptyLines'],
+            text: ['removeHTML', 'removeSpecial', 'removeExtraSpaces', 'trimWhitespace'],
+            web: ['removeHTML', 'removeURLs', 'removeExtraSpaces', 'removeEmptyLines', 'trimWhitespace']
+        };
+
+        function applyPreset(name) {
+            state.pipeline = [];
+            presets[name].forEach(action => {
+                state.pipeline.push({ action, name: opNames[action] });
+            });
+            renderPipeline();
+            processText();
+            saveHistory('Preset: ' + name);
+            closeModal('presetsModal');
+            toast(`Applied ${name} preset`);
+        }
+
+        // ===================== INIT =====================
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Theme
+            if (localStorage.getItem('theme') === 'light') {
+                document.body.dataset.theme = 'light';
+                $('themeToggle').querySelector('i').className = 'fas fa-sun';
+            }
+
+            // Auto-apply state
+            state.autoApply = localStorage.getItem('autoApply') !== 'false';
+            dom.autoApply.checked = state.autoApply;
+            dom.autoApplyToggle.classList.toggle('active', state.autoApply);
+
+            // Sidebar toggles
+            $$('.sidebar-header').forEach(h => {
+                h.onclick = () => {
+                    h.classList.toggle('collapsed');
+                    document.querySelector(`[data-content="${h.dataset.section}"]`).classList.toggle('collapsed');
+                };
+            });
+
+            // Action buttons
+            $$('[data-action]').forEach(btn => {
+                btn.onclick = () => {
+                    const action = btn.dataset.action;
+                    
+                    // Handle modal actions
+                    if (action === 'addPrefix' || action === 'addSuffix') {
+                        $('prefixModalTitle').textContent = action === 'addPrefix' ? 'Add Prefix' : 'Add Suffix';
+                        $('prefixModalLabel').textContent = action === 'addPrefix' ? 'Prefix:' : 'Suffix:';
+                        $('prefixInput').dataset.action = action;
+                        $('prefixInput').value = '';
+                        openModal('prefixModal');
+                        return;
+                    }
+                    
+                    if (action === 'wrapLines') {
+                        $('wrapBefore').value = '';
+                        $('wrapAfter').value = '';
+                        openModal('wrapModal');
+                        return;
+                    }
+
+                    addToPipeline(action);
+                    saveHistory(opNames[action] || action);
+                };
+            });
+
+            // Preset items
+            $$('[data-preset]').forEach(p => {
+                p.onclick = () => applyPreset(p.dataset.preset);
+            });
+
+            // Stats tabs
+            $$('.stats-tab').forEach(tab => {
+                tab.onclick = () => {
+                    $$('.stats-tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    state.activeStatsTab = tab.dataset.tab;
+                    updateStats();
+                };
+            });
+
+            // Input change - debounced auto-apply
+            dom.input.oninput = () => {
+                clearTimeout(state.debounceTimer);
+                state.debounceTimer = setTimeout(() => {
+                    if (state.autoApply && state.pipeline.length > 0) {
+                        processText();
+                    }
+                    updateStats();
+                }, 150);
+            };
+
+            // Auto-apply toggle
+            dom.autoApply.onchange = () => {
+                state.autoApply = dom.autoApply.checked;
+                dom.autoApplyToggle.classList.toggle('active', state.autoApply);
+                localStorage.setItem('autoApply', state.autoApply);
+                if (state.autoApply && state.pipeline.length > 0) {
+                    processText();
+                }
+                toast(state.autoApply ? 'Auto-apply enabled' : 'Auto-apply disabled', 'info');
+            };
+
+            // Header buttons
+            dom.undoBtn.onclick = undo;
+            dom.redoBtn.onclick = redo;
+            $('themeToggle').onclick = () => {
+                const isLight = document.body.dataset.theme === 'light';
+                document.body.dataset.theme = isLight ? '' : 'light';
+                $('themeToggle').querySelector('i').className = isLight ? 'fas fa-moon' : 'fas fa-sun';
+                localStorage.setItem('theme', isLight ? 'dark' : 'light');
+            };
+            $('presetsBtn').onclick = () => openModal('presetsModal');
+
+            // Pipeline buttons
+            $('applyNowBtn').onclick = () => {
+                if (state.pipeline.length > 0) {
+                    processText();
+                    saveHistory('Manual Apply');
+                    toast('Applied all operations');
+                }
+            };
+            $('clearPipelineBtn').onclick = () => {
+                clearPipeline();
+                toast('Pipeline cleared', 'info');
+            };
+
+            // Toolbar
+            $('findReplaceBtn').onclick = () => $('findReplaceBar').classList.toggle('active');
+            $('swapBtn').onclick = () => {
+                [dom.input.value, dom.output.value] = [dom.output.value, dom.input.value];
+                updateStats();
+                if (state.autoApply && state.pipeline.length > 0) processText();
+            };
+            $('clearAllBtn').onclick = () => {
+                dom.input.value = '';
+                dom.output.value = '';
+                state.pipeline = [];
+                renderPipeline();
+                updateStats();
+                toast('All cleared', 'info');
+            };
+
+            // Find/Replace
+            $('replaceBtn').onclick = () => {
+                const find = $('findInput').value;
+                if (!find) { toast('Enter text to find', 'warning'); return; }
+                
+                addToPipeline('findReplace', {
+                    find,
+                    replace: $('replaceInput').value,
+                    case: $('caseSensitive').checked,
+                    word: $('wholeWord').checked,
+                    regex: $('useRegex').checked
+                });
+                saveHistory(`Replace: ${find.slice(0, 20)}`);
+            };
+
+            $('findInput').oninput = () => {
+                const find = $('findInput').value;
+                if (!find) { $('matchInfo').textContent = ''; return; }
+                try {
+                    const re = new RegExp(find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+                    const m = dom.input.value.match(re);
+                    $('matchInfo').textContent = `${m ? m.length : 0} matches`;
+                } catch { $('matchInfo').textContent = 'Invalid'; }
+            };
+
+            // Panel buttons
+            $('pasteBtn').onclick = async () => {
+                try {
+                    dom.input.value = await navigator.clipboard.readText();
+                    updateStats();
+                    if (state.autoApply && state.pipeline.length > 0) processText();
+                    toast('Pasted!');
+                } catch { toast('Paste failed', 'error'); }
+            };
+            $('clearInputBtn').onclick = () => { dom.input.value = ''; dom.output.value = ''; updateStats(); };
+            $('copyInputBtn').onclick = () => { navigator.clipboard.writeText(dom.input.value); toast('Input copied!'); };
+            $('copyOutputBtn').onclick = () => { navigator.clipboard.writeText(dom.output.value); toast('Output copied!'); };
+            $('downloadBtn').onclick = () => {
+                const text = dom.output.value || dom.input.value;
+                if (!text) { toast('Nothing to download', 'warning'); return; }
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+                a.download = 'cleaned.txt';
+                a.click();
+                toast('Downloaded!');
+            };
+            $('importBtn').onclick = () => $('fileInput').click();
+            $('exportBtn').onclick = () => $('downloadBtn').click();
+            $('fileInput').onchange = e => {
+                const f = e.target.files[0];
+                if (!f) return;
+                const r = new FileReader();
+                r.onload = ev => {
+                    dom.input.value = ev.target.result;
+                    updateStats();
+                    if (state.autoApply && state.pipeline.length > 0) processText();
+                    toast(`Imported: ${f.name}`);
+                };
+                r.readAsText(f);
+                e.target.value = '';
+            };
+
+            // History
+            $('clearHistoryBtn').onclick = () => {
+                state.history = [];
+                state.historyIndex = -1;
+                updateHistoryUI();
+                updateUndoRedo();
+                toast('History cleared', 'info');
+            };
+
+            // Modal: Prefix/Suffix
+            $('prefixApplyBtn').onclick = () => {
+                const action = $('prefixInput').dataset.action;
+                const text = $('prefixInput').value;
+                if (!text) { toast('Enter text', 'warning'); return; }
+                addToPipeline(action, { text, eachLine: $('prefixEachLine').checked });
+                saveHistory(action === 'addPrefix' ? 'Add Prefix' : 'Add Suffix');
+                closeModal('prefixModal');
+            };
+
+            // Modal: Wrap
+            $('wrapApplyBtn').onclick = () => {
+                addToPipeline('wrapLines', {
+                    before: $('wrapBefore').value,
+                    after: $('wrapAfter').value
+                });
+                saveHistory('Wrap Lines');
+                closeModal('wrapModal');
+            };
+
+            // Close modals on overlay click
+            $$('.modal-overlay').forEach(m => {
+                m.onclick = e => { if (e.target === m) m.classList.remove('active'); };
+            });
+
+            // Keyboard shortcuts
+            document.onkeydown = e => {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
+                if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); redo(); }
+            };
+
+            // Initial
+            renderPipeline();
+            updateStats();
+            updateUndoRedo();
+        });
+    </script>
 </body>
 </html>
